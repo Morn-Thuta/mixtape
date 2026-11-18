@@ -181,8 +181,9 @@ class SASRec(Recommender):
         self.net.eval()
         L = self.cfg["max_len"]
         out = []
-        for b in range(0, len(seeds), 1024):
-            batch = seeds[b:b + 1024]
+        # 256 x n_items float32 logits = ~0.4 GB at MPD scale; safe on a 4 GB GPU
+        for b in range(0, len(seeds), 256):
+            batch = seeds[b:b + 256]
             seq = torch.from_numpy(_pad_right(batch, L)).to(self.device)
             last = (seq > 0).sum(1).clamp(min=1) - 1
             h = self.net(seq)[torch.arange(len(batch), device=self.device), last]

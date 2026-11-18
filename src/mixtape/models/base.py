@@ -18,6 +18,26 @@ class Recommender(ABC):
         """Return an (n_playlists, k) array of item ids, excluding the seeds."""
 
 
+def topk_sparse_rows(S, k: int, exclude: list[np.ndarray] | None = None) -> np.ndarray:
+    """Top-k column ids per row of a scipy CSR score matrix (only stored entries are
+    candidates), skipping column 0 (padding) and each row's excluded ids.
+    Ties go to the lower column id. Memory stays O(nnz) instead of O(rows x items)."""
+    S = S.tocsr()
+    S.sum_duplicates()
+    n = S.shape[0]
+    out = np.zeros((n, k), dtype=np.int64)
+    for i in range(n):
+        a, b = S.indptr[i], S.indptr[i + 1]
+        idx, sc = S.indices[a:b], S.data[a:b]
+        bad = idx == 0
+        if exclude is not None and len(exclude[i]):
+            bad |= np.isin(idx, exclude[i])
+        idx, sc = idx[~bad], sc[~bad]
+        top = idx[np.lexsort((idx, -sc))][:k]
+        out[i, : len(top)] = top
+    return out
+
+
 def topk_excluding(scores: np.ndarray, seeds: list[np.ndarray], k: int, xp=np) -> np.ndarray:
     """Top-k columns per row of a dense score matrix, masking padding (0) and seeds.
 

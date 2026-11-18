@@ -50,7 +50,9 @@ def _title(rng: np.random.Generator, mood: int) -> str:
 
 
 def generate(out_dir: Path, n_playlists=20_000, n_tracks=8_000, n_moods=24,
-             n_sub=4, slice_size=1_000, seed=42) -> list[Path]:
+             n_sub=4, slice_size=1_000, seed=42, len_mu=3.4, max_len=150) -> list[Path]:
+    """len_mu: log-mean of the lognormal playlist length (3.4 -> ~36 tracks on average;
+    4.0 -> ~66, matching the real MPD). max_len caps length (MPD's cap is 250)."""
     rng = np.random.default_rng(seed)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -95,7 +97,7 @@ def generate(out_dir: Path, n_playlists=20_000, n_tracks=8_000, n_moods=24,
         for pid in range(start, end):
             mood = int(rng.integers(n_moods))
             alt = int(rng.integers(n_moods)) if rng.random() < 0.3 else None
-            length = int(np.clip(rng.lognormal(3.4, 0.6), 5, 150))
+            length = int(np.clip(rng.lognormal(len_mu, 0.6), 5, max_len))
             sub = int(rng.integers(n_sub))
             seen: set[int] = set()
             tracks = []

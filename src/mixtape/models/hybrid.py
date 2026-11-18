@@ -11,9 +11,10 @@ matters most when a playlist has only one or two seed tracks.
 from __future__ import annotations
 
 import numpy as np
+import scipy.sparse as sps
 
 from mixtape.data.dataset import Dataset
-from mixtape.models.base import Recommender
+from mixtape.models.base import Recommender, topk_sparse_rows
 
 
 class Hybrid(Recommender):
@@ -46,11 +47,17 @@ class Hybrid(Recommender):
 
 def fuse(lists: list[np.ndarray], weights: list[float], n_items: int, k: int,
          c: float = 60.0) -> np.ndarray:
+    """Weighted reciprocal rank fusion. Sparse: only the (row, item) pairs that some
+    model actually ranked are stored, so memory is O(rows x depth), not O(rows x items)."""
     n = lists[0].shape[0]
-    scores = np.zeros((n, n_items + 1), dtype=np.float32)
-    rows = np.arange(n)[:, None]
+    rows, cols, vals = [], [], []
     for recs, w in zip(lists, weights):
-        rank_score = 1.0 / (c + np.arange(1, recs.shape[1] + 1, dtype=np.float32))
-        np.add.at(scores, (rows, recs), w * rank_score[None, :])
-    scores[:, 0] = -np.inf
-    return np.argsort(-scores, axis=1)[:, :k]
+        d = recs.shape[1]
+        rank_score = w / (c + np.arange(1, d + 1, dtype=np.float32))
+        rows.append(np.repeat(np.arange(n), d))
+        cols.append(recs.ravel())
+        vals.append(np.tile(rank_score, n))
+    rows, cols, vals = np.concatenate(rows), np.concatenate(cols), np.concatenate(vals)
+    keep = cols > 0                                          # 0 = padding
+    S = sps.csr_matrix((vals[keep], (rows[keep], cols[keep])), shape=(n, n_items + 1))
+    return topk_sparse_rows(S, k)

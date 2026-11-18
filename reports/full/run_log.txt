@@ -1,1 +1,6 @@
 === 2026-11-18T20:13:19+08:00 ===
+synth          rc=0     741s  gpu_peak=0MiB
+ingest         rc=0     178s  gpu_peak=0MiB
+prep           rc=0      10s  gpu_peak=2215MiB
+=== 2026-11-18T20:29:09+08:00 ===
+cooccur        rc=1       9s  gpu_peak=0MiB

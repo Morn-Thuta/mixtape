@@ -13,7 +13,7 @@ import numpy as np
 import scipy.sparse as sps
 
 from mixtape.data.dataset import Dataset
-from mixtape.models.base import topk_excluding
+from mixtape.models.base import topk_sparse_rows
 
 
 def normalize(title: str) -> str:
@@ -33,9 +33,14 @@ class _TfidfEncoder:
         self.vec.fit(texts)
         return self
 
-    def encode(self, texts) -> np.ndarray:
-        m = self.vec.transform(texts)
-        return m.toarray().astype(np.float32)  # rows are already L2-normalised
+    def encode(self, texts):
+        # stays sparse: a dense TF-IDF matrix of ~100k titles x ~50k char n-grams
+        # would be ~20 GB. Rows are already L2-normalised.
+        return self.vec.transform(texts).astype(np.float32)
+
+    @staticmethod
+    def sim(q, E) -> np.ndarray:
+        return (q @ E.T).toarray()
 
 
 class _SentenceEncoder:
@@ -51,23 +56,29 @@ class _SentenceEncoder:
         return self.model.encode(list(texts), batch_size=256, normalize_embeddings=True,
                                  convert_to_numpy=True, show_progress_bar=False)
 
+    @staticmethod
+    def sim(q, E) -> np.ndarray:
+        return q @ E.T
+
 
 class _HybridEncoder:
-    """Concatenate L2-normalised TF-IDF and transformer vectors, each scaled by
-    sqrt(w), so the dot product is w_tfidf*cos_tfidf + w_st*cos_st: exact-wording
-    matches from TF-IDF plus meaning-level matches from the transformer."""
+    """Similarity = w_tfidf * cos_tfidf + (1 - w_tfidf) * cos_transformer:
+    exact-wording matches from TF-IDF plus meaning-level matches from the transformer."""
 
     def __init__(self, model_name: str, w_tfidf: float = 0.5):
         self.tfidf, self.st = _TfidfEncoder(), _SentenceEncoder(model_name)
-        self.a, self.b = np.sqrt(w_tfidf), np.sqrt(1 - w_tfidf)
+        self.w = w_tfidf
         self.name = f"hybrid(tfidf+{model_name.split('/')[-1]})"
 
     def fit(self, texts):
         self.tfidf.fit(texts)
         return self
 
-    def encode(self, texts) -> np.ndarray:
-        return np.hstack([self.a * self.tfidf.encode(texts), self.b * self.st.encode(texts)])
+    def encode(self, texts):
+        return self.tfidf.encode(texts), self.st.encode(texts)
+
+    def sim(self, q, E) -> np.ndarray:
+        return self.w * self.tfidf.sim(q[0], E[0]) + (1 - self.w) * self.st.sim(q[1], E[1])
 
 
 def make_encoder(model_name: str | None, prefer_transformer: bool = True):
@@ -110,19 +121,24 @@ class TitleRecommender:
         return self
 
     def recommend_titles(self, titles: list[str], k: int,
-                         exclude: list[np.ndarray] | None = None) -> np.ndarray:
-        q = self.encoder.encode([normalize(t) for t in titles])
-        sim = q @ self.E.T                                     # (n, n_titles)
-        m = min(self.top_m, sim.shape[1])
-        idx = np.argpartition(-sim, m - 1, axis=1)[:, :m]
-        w = np.take_along_axis(sim, idx, 1).clip(min=0)
-        W = sps.csr_matrix((w.ravel(), (np.repeat(np.arange(len(titles)), m), idx.ravel())),
-                           shape=sim.shape)
-        scores = (W @ self.T).toarray()
-        exclude = exclude or [np.array([], dtype=np.int64)] * len(titles)
-        return topk_excluding(scores, exclude, k)
+                         exclude: list[np.ndarray] | None = None,
+                         batch_size: int = 512) -> np.ndarray:
+        """Batched and sparse end to end: memory is O(batch x n_titles), never
+        O(queries x tracks) (that would be ~14 GB for 10k queries on the MPD)."""
+        out = []
+        for b in range(0, len(titles), batch_size):
+            chunk = titles[b:b + batch_size]
+            sim = self.encoder.sim(self.encoder.encode([normalize(t) for t in chunk]), self.E)
+            m = min(self.top_m, sim.shape[1])
+            idx = np.argpartition(-sim, m - 1, axis=1)[:, :m]
+            w = np.take_along_axis(sim, idx, 1).clip(min=0)
+            W = sps.csr_matrix((w.ravel(), (np.repeat(np.arange(len(chunk)), m), idx.ravel())),
+                               shape=sim.shape)
+            ex = exclude[b:b + batch_size] if exclude is not None else None
+            out.append(topk_sparse_rows(W @ self.T, k, ex))
+        return np.vstack(out) if out else np.zeros((0, k), dtype=np.int64)
 
     def similar_titles(self, title: str, n: int = 5) -> list[tuple[str, float]]:
-        sim = (self.encoder.encode([normalize(title)]) @ self.E.T).ravel()
+        sim = self.encoder.sim(self.encoder.encode([normalize(title)]), self.E).ravel()
         top = np.argsort(-sim)[:n]
         return [(str(self.uniq[i]), round(float(sim[i]), 3)) for i in top]
