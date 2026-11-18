@@ -86,6 +86,13 @@ def test_sasrec_window_targets_stay_in_playlist():
     assert (tgt[1][mask[1]] > inp[1][mask[1]]).all()
 
 
+def test_sasrec_early_stopping_restores_best(data):
+    m = SASRec(max_len=20, dim=16, heads=2, layers=1, epochs=6, batch_size=64, device="cpu",
+               val_size=20, eval_every=2, patience=1).fit(data)
+    assert m.best_epoch is not None
+    assert any("val_recall@50" in h for h in m.history)
+
+
 def test_fuse_prefers_agreement():
     from mixtape.models.hybrid import fuse
     a = np.array([[1, 2, 3]])

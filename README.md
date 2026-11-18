@@ -62,6 +62,7 @@ The synthetic generator (`data/synthetic.py`) writes the **exact same JSON forma
 | | co-occurrence | **0.398** | **0.402** |
 | | SASRec, next-item, 30 epochs | 0.246 | 0.203 |
 | | SASRec, window-5 targets, 60 epochs | 0.310 | 0.284 |
+| | SASRec, window-5 + early stopping (best epoch 65) | 0.324 | 0.302 |
 | | hybrid (co-occurrence + 0.25 × SASRec) | 0.398 | 0.400 |
 | Cold start (title only) | popularity | 0.069 | 0.071 |
 | | title encoder (TF-IDF) | **0.370** | **0.420** |
@@ -77,7 +78,7 @@ Louvain recovered all 24 planted moods (modularity 0.87).
 - [ ] Sentence-transformer title encoder vs TF-IDF
 - [x] SASRec future-window targets (`sasrec.target_window`) and longer training
 - [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec
-- [ ] Validation split + early stopping for SASRec (the low final loss suggests it memorises)
+- [x] Validation split + early stopping for SASRec (`sasrec.val_size`, `patience`)
 - [ ] Add the title model to the hybrid for playlists with few seed tracks
 - [ ] Use cuGraph communities/PageRank as features
 - [ ] Small web demo (Streamlit): type a title or pick seed songs → playlist

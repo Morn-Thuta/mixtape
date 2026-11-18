@@ -11,6 +11,7 @@ Sequences are RIGHT-padded with 0, so real tokens never attend to padding.
 from __future__ import annotations
 
 import math
+import sys
 import time
 
 import numpy as np
@@ -61,8 +62,12 @@ class SASRec(Recommender):
     name = "sasrec"
 
     def __init__(self, max_len=50, dim=64, heads=2, layers=2, dropout=0.2, epochs=10,
-                 batch_size=256, lr=1e-3, n_neg=None, target_window=1, device=None, seed=42):
+                 batch_size=256, lr=1e-3, n_neg=None, target_window=1, val_size=0,
+                 eval_every=5, patience=3, val_k=50, device=None, seed=42):
         self.target_window = target_window
+        # early stopping on a held-out slice of training playlists (val_size=0 disables)
+        self.val_size, self.eval_every, self.patience, self.val_k = val_size, eval_every, patience, val_k
+        self.best_epoch = None
         self.cfg = dict(max_len=max_len, dim=dim, heads=heads, layers=layers, dropout=dropout)
         self.epochs, self.batch_size, self.lr = epochs, batch_size, lr
         self.n_neg = n_neg  # None -> full softmax if catalogue is small, else 128 sampled
@@ -76,8 +81,11 @@ class SASRec(Recommender):
         self.n_items = data.n_items
         n_neg = self.n_neg if self.n_neg is not None else (0 if data.n_items <= 50_000 else 128)
         L = self.cfg["max_len"]
-        seqs = _pad_right(data.train_sequences(), L + 1)   # +1: input/target shift
+        all_seqs = data.train_sequences()
+        val_seeds, val_targets = self._carve_validation(all_seqs, data, rng)
+        seqs = _pad_right(all_seqs, L + 1)   # +1: input/target shift
         seqs = seqs[(seqs > 0).sum(1) >= 2]
+        best_score, best_state, bad = -1.0, None, 0
         self.net = SASRecNet(data.n_items, L, **{k: v for k, v in self.cfg.items() if k != "max_len"}) \
             .to(self.device)
         opt = torch.optim.AdamW(self.net.parameters(), lr=self.lr, weight_decay=0.01)
@@ -89,7 +97,7 @@ class SASRec(Recommender):
             t0, total, n = time.perf_counter(), 0.0, 0
             order = rng.permutation(len(seqs))
             for b in tqdm(range(0, len(order), self.batch_size), desc=f"epoch {epoch + 1}",
-                          leave=False):
+                          leave=False, disable=not sys.stderr.isatty()):
                 batch = torch.from_numpy(seqs[order[b:b + self.batch_size]]).to(self.device)
                 inp, tgt, mask = self._targets(batch)
                 with torch.autocast(self.device.type, enabled=use_amp):
@@ -113,9 +121,41 @@ class SASRec(Recommender):
                 n += len(t)
             self.history.append({"epoch": epoch + 1, "loss": round(total / n, 4),
                                  "seconds": round(time.perf_counter() - t0, 2)})
-            print(f"  epoch {epoch + 1}/{self.epochs}  loss={total / n:.4f}  "
-                  f"({time.perf_counter() - t0:.1f}s on {self.device})")
+            msg = (f"  epoch {epoch + 1}/{self.epochs}  loss={total / n:.4f}  "
+                   f"({time.perf_counter() - t0:.1f}s on {self.device})")
+            if val_seeds and (epoch + 1) % self.eval_every == 0:
+                from mixtape.eval.metrics import recall_at_k
+                score = recall_at_k(self.recommend(val_seeds, self.val_k), val_targets, self.val_k)
+                self.history[-1][f"val_recall@{self.val_k}"] = round(score, 4)
+                msg += f"  val recall@{self.val_k}={score:.4f}"
+                if score > best_score:
+                    best_score, bad = score, 0
+                    best_state = {k: v.detach().clone() for k, v in self.net.state_dict().items()}
+                    self.best_epoch = epoch + 1
+                else:
+                    bad += 1
+            print(msg)
+            if val_seeds and bad >= self.patience:
+                print(f"  early stop: best val recall@{self.val_k}={best_score:.4f} "
+                      f"at epoch {self.best_epoch}")
+                break
+        if best_state is not None:
+            self.net.load_state_dict(best_state)
         return self
+
+    def _carve_validation(self, all_seqs: list[np.ndarray], data: Dataset, rng):
+        """Hold out `val_size` training playlists (removed in place from all_seqs).
+
+        Same protocol as the test set: first n_seed tracks in, the rest are targets.
+        """
+        n_seed = len(data.seeds[0]) if data.seeds else 5
+        eligible = [i for i, s in enumerate(all_seqs) if len(s) > n_seed]
+        if self.val_size <= 0 or len(eligible) < 2 * self.val_size:
+            return [], []
+        pick = set(rng.choice(eligible, self.val_size, replace=False).tolist())
+        val = [all_seqs[i] for i in sorted(pick)]
+        all_seqs[:] = [s for i, s in enumerate(all_seqs) if i not in pick]
+        return [s[:n_seed] for s in val], [s[n_seed:] for s in val]
 
     def _targets(self, batch: torch.Tensor):
         """Inputs, targets and mask for one batch of right-padded sequences.
