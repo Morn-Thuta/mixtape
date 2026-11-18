@@ -80,6 +80,17 @@ Same code, same data; best of 3 passes per backend. Full tables: [reports/benchm
 
 Louvain recovered all 24 planted moods (modularity 0.87) on both CPU and GPU.
 
+### Adding the playlist title to the hybrid
+
+`scripts/hybrid_title_experiment.py`: co-occurrence + SASRec + title model, fused by reciprocal rank (title weight 1.0).
+
+| Seed tracks given | Best single model (recall / ndcg @50) | Full hybrid (recall / ndcg @50) |
+|---|---|---|
+| 1 | 0.359 / 0.384 (co-occurrence) | **0.389 / 0.425** (+8% / +11%) |
+| 5 | 0.405 / 0.409 (co-occurrence) | 0.404 / **0.419** |
+
+The name helps most when a playlist has only one or two songs, which is exactly when the track-based models know least.
+
 ### Title encoders: spelling vs meaning (cold start)
 
 `scripts/compare_title_encoders.py`. *Seen titles* are test playlists whose names also occur in training. *Unseen phrasings* are 24 hand-written queries that share no words with any training title (e.g. "marathon training" → running); the score is the share of the top 50 tracks that come from the right mood.
@@ -107,6 +118,6 @@ TF-IDF matches spelling, so it wins when the exact title was seen before but map
 - [x] SASRec future-window targets (`sasrec.target_window`) and longer training
 - [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec
 - [x] Validation split + early stopping for SASRec (`sasrec.val_size`, `patience`)
-- [ ] Add the title model to the hybrid for playlists with few seed tracks
+- [x] Add the title model to the hybrid for playlists with few seed tracks
 - [ ] Use cuGraph communities/PageRank as features
 - [ ] Small web demo (Streamlit): type a title or pick seed songs → playlist

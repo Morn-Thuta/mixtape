@@ -100,6 +100,17 @@ def test_fuse_prefers_agreement():
     assert fuse([a, b], [1.0, 1.0], n_items=5, k=1)[0, 0] == 3
 
 
+def test_hybrid_with_title_excludes_seeds(data):
+    from mixtape.models.hybrid import Hybrid
+    h = Hybrid([Popularity(), CoOccurrence(get_backend("cpu"))], [0.5, 1.0],
+               title_model=TitleRecommender(prefer_transformer=False), title_weight=1.0).fit(data)
+    titles = [data.titles.get(p, "") for p in data.test_pids]
+    recs = h.recommend(data.seeds, 20, titles=titles)
+    assert recs.shape == (len(data.seeds), 20)
+    for r, s in zip(recs, data.seeds):
+        assert not np.isin(r, s).any() and 0 not in r
+
+
 def test_title_cold_start(data):
     tm = TitleRecommender(prefer_transformer=False).fit(data)
     recs = tm.recommend_titles(["gym 💪", "chill vibes"], 10)

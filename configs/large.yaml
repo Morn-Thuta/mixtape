@@ -44,6 +44,7 @@ sasrec:
 
 hybrid:
   weights: [1.0, 0.5]      # [cooccur, sasrec] reciprocal-rank-fusion weights
+  title_weight: 1.0        # playlist-name model; 0 disables (see reports/hybrid_title.json)
 
 title:
   # TF-IDF (exact wording) + MPNet (meaning); see reports/title_encoders.json

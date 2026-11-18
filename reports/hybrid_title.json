@@ -1,0 +1,76 @@
+{
+  "1_seed": {
+    "cooccur": {
+      "recall@50": 0.3593,
+      "ndcg@50": 0.3843,
+      "hit@50": 0.9613
+    },
+    "sasrec": {
+      "recall@50": 0.3196,
+      "ndcg@50": 0.3265,
+      "hit@50": 0.9634
+    },
+    "title": {
+      "recall@50": 0.3519,
+      "ndcg@50": 0.4023,
+      "hit@50": 0.999
+    },
+    "cooccur+sasrec+title(w=0.25)": {
+      "recall@50": 0.3718,
+      "ndcg@50": 0.4081,
+      "hit@50": 0.9623
+    },
+    "cooccur+sasrec+title(w=0.5)": {
+      "recall@50": 0.3754,
+      "ndcg@50": 0.4134,
+      "hit@50": 0.9634
+    },
+    "cooccur+sasrec+title(w=1.0)": {
+      "recall@50": 0.3885,
+      "ndcg@50": 0.4249,
+      "hit@50": 0.999
+    },
+    "cooccur+sasrec": {
+      "recall@50": 0.3672,
+      "ndcg@50": 0.3982,
+      "hit@50": 0.9623
+    }
+  },
+  "5_seed": {
+    "cooccur": {
+      "recall@50": 0.4048,
+      "ndcg@50": 0.409,
+      "hit@50": 0.999
+    },
+    "sasrec": {
+      "recall@50": 0.3277,
+      "ndcg@50": 0.3132,
+      "hit@50": 0.9927
+    },
+    "title": {
+      "recall@50": 0.3466,
+      "ndcg@50": 0.374,
+      "hit@50": 0.9948
+    },
+    "cooccur+sasrec+title(w=0.25)": {
+      "recall@50": 0.4032,
+      "ndcg@50": 0.4121,
+      "hit@50": 0.999
+    },
+    "cooccur+sasrec+title(w=0.5)": {
+      "recall@50": 0.4039,
+      "ndcg@50": 0.4155,
+      "hit@50": 0.9969
+    },
+    "cooccur+sasrec+title(w=1.0)": {
+      "recall@50": 0.404,
+      "ndcg@50": 0.4185,
+      "hit@50": 0.9969
+    },
+    "cooccur+sasrec": {
+      "recall@50": 0.4019,
+      "ndcg@50": 0.4058,
+      "hit@50": 0.999
+    }
+  }
+}

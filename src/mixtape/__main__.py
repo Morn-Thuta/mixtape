@@ -36,7 +36,7 @@ def cmd_prep(cfg, args):
     print(json.dumps(stats, indent=2))
 
 
-def _build(name, cfg):
+def _build(name, cfg, tfidf: bool = False):
     from mixtape.backend import get_backend
     from mixtape.models.cooccur import CoOccurrence
     from mixtape.models.popularity import Popularity
@@ -49,7 +49,14 @@ def _build(name, cfg):
         return SASRec(**cfg["sasrec"])
     if name == "hybrid":
         from mixtape.models.hybrid import Hybrid
-        return Hybrid([_build("cooccur", cfg), _build("sasrec", cfg)], cfg["hybrid"]["weights"])
+        from mixtape.models.title import TitleRecommender
+        h = cfg["hybrid"]
+        title = None
+        if h.get("title_weight", 0) > 0:
+            title = TitleRecommender(cfg["title"]["model"], cfg["title"]["top_m"],
+                                     prefer_transformer=not tfidf)
+        return Hybrid([_build("cooccur", cfg), _build("sasrec", cfg)], h["weights"],
+                      title_model=title, title_weight=h.get("title_weight", 0))
     raise ValueError(name)
 
 
@@ -69,10 +76,14 @@ def cmd_train(cfg, args):
             continue
         print(f"\n[{name}] training...")
         t0 = time.perf_counter()
-        model = _build(name, cfg).fit(data)
+        model = _build(name, cfg, tfidf=args.tfidf).fit(data)
         fit_s = time.perf_counter() - t0
         t0 = time.perf_counter()
-        recs = model.recommend(data.seeds, k)
+        if name == "hybrid":
+            titles = [data.titles.get(p, "") for p in data.test_pids]
+            recs = model.recommend(data.seeds, k, titles=titles)
+        else:
+            recs = model.recommend(data.seeds, k)
         rec_s = time.perf_counter() - t0
         results["continuation"][name] = {**evaluate(recs, data.targets, k),
                                          "fit_s": round(fit_s, 2), "recommend_s": round(rec_s, 2)}
