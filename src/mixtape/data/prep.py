@@ -29,17 +29,17 @@ def prep(be: Backend, interim: Path, out_dir: Path, min_track_count=3,
         timings[name] = round(time.perf_counter() - t0, 4)
 
     t0 = time.perf_counter()
-    df = xdf.read_parquet(interim / "interactions.parquet")
+    df = xdf.read_parquet(interim / "interactions")
     playlists = xdf.read_parquet(interim / "playlists.parquet")
     tick("read", t0)
     n_raw = len(df)
 
     # 1. drop rare tracks (count distinct playlists per track)
     t0 = time.perf_counter()
-    df = df.drop_duplicates(subset=["pid", "track_uri"])
-    counts = df.groupby("track_uri").size().reset_index(name="cnt")
-    keep = counts[counts["cnt"] >= min_track_count][["track_uri"]]
-    df = df.merge(keep, on="track_uri", how="inner")
+    df = df.drop_duplicates(subset=["pid", "tid"])
+    counts = df.groupby("tid").size().reset_index(name="cnt")
+    keep = counts[counts["cnt"] >= min_track_count][["tid"]]
+    df = df.merge(keep, on="tid", how="inner")
     tick("filter_tracks", t0)
 
     # 2. drop short playlists
@@ -51,9 +51,9 @@ def prep(be: Backend, interim: Path, out_dir: Path, min_track_count=3,
 
     # 3. integer ids for tracks (1-based) and re-rank positions
     t0 = time.perf_counter()
-    vocab = df[["track_uri"]].drop_duplicates().sort_values("track_uri").reset_index(drop=True)
+    vocab = df[["tid"]].drop_duplicates().sort_values("tid").reset_index(drop=True)
     vocab["item"] = be.xp.arange(1, len(vocab) + 1, dtype="int32")
-    df = df.merge(vocab, on="track_uri", how="inner")
+    df = df.merge(vocab, on="tid", how="inner")
     df = df.sort_values(["pid", "pos"]).reset_index(drop=True)
     df["rank"] = df.groupby("pid").cumcount().astype("int32")
     tick("index", t0)

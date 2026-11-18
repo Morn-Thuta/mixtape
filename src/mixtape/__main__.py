@@ -108,7 +108,7 @@ def cmd_graph(cfg, args):
     nodes, summary = analyze(get_backend(), data, cfg["graph"]["top_n_tracks"],
                              cfg["graph"]["min_edge_weight"])
     tracks = pd.read_parquet(cfg["paths"]["interim"] / "tracks.parquet")
-    nodes = nodes.merge(data.vocab, on="item").merge(tracks, on="track_uri", how="left")
+    nodes = nodes.merge(data.vocab, on="item").merge(tracks, on="tid", how="left")
     nodes.to_parquet(cfg["paths"]["reports"] / "graph_nodes.parquet", index=False)
     print(json.dumps(summary, indent=2))
     big = nodes["community"].value_counts().head(5).index
@@ -131,7 +131,7 @@ def cmd_demo(cfg, args):
 
     data = load_dataset(cfg["paths"]["processed"])
     tracks = pd.read_parquet(cfg["paths"]["interim"] / "tracks.parquet")
-    names = data.vocab.merge(tracks, on="track_uri").set_index("item")
+    names = data.vocab.merge(tracks, on="tid").set_index("item")
     tm = TitleRecommender(cfg["title"]["model"], cfg["title"]["top_m"],
                           prefer_transformer=not args.tfidf).fit(data)
     print(f'Similar titles to "{args.title}": {tm.similar_titles(args.title)}')

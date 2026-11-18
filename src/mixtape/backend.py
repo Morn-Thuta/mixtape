@@ -58,6 +58,12 @@ def get_backend(name: str | None = None) -> Backend:
         import cudf
         import cupy
         import cupyx.scipy.sparse as cps
+        # Small GPUs (e.g. 4 GB laptop cards): let cuDF spill device buffers to host
+        # RAM under memory pressure instead of raising out-of-memory on big joins.
+        try:
+            cudf.set_option("spill", True)
+        except Exception:
+            pass
         return Backend("gpu", cudf, cupy, cps)
     if name == "cpu":
         import numpy

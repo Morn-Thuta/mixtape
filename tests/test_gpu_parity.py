@@ -37,8 +37,8 @@ def test_prep_same_vocab_and_counts(dirs):
         a = pd.read_parquet(dirs / "cpu" / f)
         b = pd.read_parquet(dirs / "gpu" / f)
         assert len(a) == len(b), f
-    va = pd.read_parquet(dirs / "cpu" / "vocab.parquet").sort_values("track_uri")
-    vb = pd.read_parquet(dirs / "gpu" / "vocab.parquet").sort_values("track_uri")
+    va = pd.read_parquet(dirs / "cpu" / "vocab.parquet").sort_values("tid")
+    vb = pd.read_parquet(dirs / "gpu" / "vocab.parquet").sort_values("tid")
     assert (va["item"].to_numpy() == vb["item"].to_numpy()).all()
 
 

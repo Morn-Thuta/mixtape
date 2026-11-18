@@ -16,7 +16,7 @@ class Dataset:
     seeds: list[np.ndarray]      # aligned with test_pids
     targets: list[np.ndarray]    # aligned with test_pids
     titles: dict[int, str]       # pid -> playlist name (all playlists)
-    vocab: pd.DataFrame          # track_uri, item
+    vocab: pd.DataFrame          # tid, item  (tid -> interim/tracks.parquet)
 
     @property
     def train_only(self) -> pd.DataFrame:
