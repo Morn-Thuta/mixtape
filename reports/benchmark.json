@@ -1,18 +1,60 @@
 {
   "rows": 696845,
+  "repeats": 3,
   "results": {
     "cpu": {
-      "prep.read": 0.136,
-      "prep.filter_tracks": 0.1886,
-      "prep.filter_playlists": 0.0484,
-      "prep.index": 0.1835,
-      "prep.split": 0.0728,
-      "prep.write": 0.0906,
-      "prep.total": 0.7199,
-      "cooccur.fit": 0.0419,
-      "cooccur.recommend": 0.2723,
-      "graph.build": 0.249,
-      "graph.louvain+pagerank": 11.119
+      "prep.read": 0.0464,
+      "prep.filter_tracks": 0.1599,
+      "prep.filter_playlists": 0.0797,
+      "prep.index": 0.1682,
+      "prep.split": 0.0421,
+      "prep.write": 0.1611,
+      "prep.total": 0.7311,
+      "cooccur.fit": 0.0363,
+      "cooccur.recommend": 0.3146,
+      "graph.build": 0.21,
+      "graph.louvain+pagerank": 8.694
+    },
+    "gpu": {
+      "prep.read": 0.0619,
+      "prep.filter_tracks": 0.0373,
+      "prep.filter_playlists": 0.0192,
+      "prep.index": 0.073,
+      "prep.split": 0.0457,
+      "prep.write": 0.1242,
+      "prep.total": 0.3613,
+      "cooccur.fit": 0.0477,
+      "cooccur.recommend": 0.1767,
+      "graph.build": 0.151,
+      "graph.louvain+pagerank": 0.303
+    }
+  },
+  "first_pass": {
+    "cpu": {
+      "prep.read": 0.2312,
+      "prep.filter_tracks": 0.281,
+      "prep.filter_playlists": 0.115,
+      "prep.index": 0.2211,
+      "prep.split": 0.0598,
+      "prep.write": 0.1611,
+      "prep.total": 1.0692,
+      "cooccur.fit": 0.0528,
+      "cooccur.recommend": 0.3146,
+      "graph.build": 0.247,
+      "graph.louvain+pagerank": 10.073
+    },
+    "gpu": {
+      "prep.read": 1.8414,
+      "prep.filter_tracks": 0.2348,
+      "prep.filter_playlists": 0.0214,
+      "prep.index": 0.369,
+      "prep.split": 0.298,
+      "prep.write": 0.2079,
+      "prep.total": 2.9725,
+      "cooccur.fit": 0.3329,
+      "cooccur.recommend": 0.2712,
+      "graph.build": 0.228,
+      "graph.louvain+pagerank": 2.585
     }
   }
 }

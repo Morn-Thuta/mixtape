@@ -11,3 +11,5 @@ data/processed/*
 !data/**/.gitkeep
 reports/*.pt
 reports/*.parquet
+data/large/
+reports/large/*.parquet

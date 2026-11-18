@@ -54,27 +54,41 @@ Then `python -m mixtape bench` fills both columns of `reports/benchmark.md`.
 
 The synthetic generator (`data/synthetic.py`) writes the **exact same JSON format**, so nothing else changes.
 
-## Results so far (synthetic data, 20k playlists, k=50)
+## CPU vs GPU (RTX 3050 Laptop, 4 GB, WSL2, RAPIDS 26.10)
+
+Same code, same data; best of 3 passes per backend. Full tables: [reports/benchmark.md](reports/benchmark.md) and [reports/large/benchmark.md](reports/large/benchmark.md).
+
+| Stage | 0.7M rows: CPU → GPU | speedup | 7M rows: CPU → GPU | speedup |
+|---|---|---:|---|---:|
+| Data prep (cuDF) | 0.73 s → 0.36 s | 2.0× | 9.38 s → 1.10 s | **8.5×** |
+| Co-occurrence scoring (CuPy sparse) | 0.32 s → 0.18 s | 1.8× | 32.7 s → 8.5 s | **3.9×** |
+| Louvain + PageRank (cuGraph) | 8.69 s → 0.30 s | 28.7× | 17.8 s → 0.37 s | **47.7×** |
+
+**The speedup grows with data size.** At 0.7M rows the GPU's fixed costs (kernel launches, host↔device copies) eat most of the gain, and a few tiny steps are even slower on GPU. At 7M rows the per-row work dominates and cuDF's group-bys and joins pull ahead (the track-filter step alone is 22.6× faster). The full MPD is 66M rows, about 10× larger again.
+
+## Model results (synthetic data, 20k playlists, k=50, prepared and trained on GPU)
 
 | Task | Model | recall@50 | ndcg@50 |
 |---|---|---:|---:|
-| Continuation (5 seed tracks) | popularity | 0.062 | 0.058 |
-| | co-occurrence | **0.398** | **0.402** |
+| Continuation (5 seed tracks) | popularity | 0.061 | 0.058 |
+| | co-occurrence | **0.405** | **0.409** |
 | | SASRec, next-item, 30 epochs | 0.246 | 0.203 |
-| | SASRec, window-5 targets, 60 epochs | 0.310 | 0.284 |
-| | SASRec, window-5 + early stopping (best epoch 65) | 0.324 | 0.302 |
-| | hybrid (co-occurrence + 0.25 × SASRec) | 0.398 | 0.400 |
-| Cold start (title only) | popularity | 0.069 | 0.071 |
-| | title encoder (TF-IDF) | **0.370** | **0.420** |
+| | SASRec, window-5 targets + early stopping | 0.329 | 0.306 |
+| | hybrid (co-occurrence + 0.5 × SASRec) | 0.402 | 0.405 |
+| Cold start (title only) | popularity | 0.070 | 0.073 |
+| | title encoder (TF-IDF) | **0.374** | **0.428** |
 
-Louvain recovered all 24 planted moods (modularity 0.87).
+Louvain recovered all 24 planted moods (modularity 0.87) on both CPU and GPU.
 
-**Reading these numbers.** The synthetic generator builds playlists mostly by sampling from a mood bucket, which is exactly what co-occurrence captures. The only order signal is a weak drift between sub-scenes, so SASRec and the hybrid can't beat co-occurrence here. Real playlists have stronger order effects (album runs, energy arcs), so the real comparison needs MPD data. Training SASRec to predict *any of the next 5 tracks*, instead of only the next one, raised its recall@50 from 0.25 to 0.31.
+**Reading these numbers.** The synthetic generator builds playlists mostly by sampling from a mood bucket, which is exactly what co-occurrence captures. The only order signal is a weak drift between sub-scenes, so SASRec and the hybrid can't beat co-occurrence here. Real playlists have stronger order effects (album runs, energy arcs), so the real comparison needs MPD data. Training SASRec to predict *any of the next 5 tracks*, instead of only the next one, plus early stopping, raised its recall@50 from 0.25 to 0.33.
+
+**Reproducibility.** The train/test split uses a deterministic hash of the playlist id, so pandas and cuDF hold out exactly the same playlists (`tests/test_gpu_parity.py` checks that both backends agree).
 
 ## Roadmap
 
 - [ ] Run on real MPD slices (start with 50, then all 1,000)
-- [ ] Fill the GPU column of the benchmark on Colab
+- [x] Fill the GPU column of the benchmark (WSL2, RTX 3050), at 0.7M and 7M rows
+- [ ] Benchmark at full MPD scale (66M rows) on Colab T4 (16 GB)
 - [ ] Sentence-transformer title encoder vs TF-IDF
 - [x] SASRec future-window targets (`sasrec.target_window`) and longer training
 - [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec

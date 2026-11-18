@@ -44,7 +44,7 @@ def analyze(be: Backend, data: Dataset, top_n=5000, min_w=3, seed=42) -> tuple[p
         import cugraph
         G = cugraph.Graph()
         G.from_cudf_edgelist(cudf.from_pandas(edges), source="src", destination="dst",
-                             edge_attr="weight")
+                             edge_attr="weight", store_transposed=True)
         parts, modularity = cugraph.louvain(G)
         pr = cugraph.pagerank(G)
         nodes = parts.merge(pr, on="vertex").to_pandas() \

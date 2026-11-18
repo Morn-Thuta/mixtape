@@ -61,7 +61,10 @@ def prep(be: Backend, interim: Path, out_dir: Path, min_track_count=3,
     # 4. split
     t0 = time.perf_counter()
     pids = df[["pid"]].drop_duplicates()
-    test_pids = pids.sample(frac=test_frac, random_state=seed)
+    # Deterministic hash split (Knuth multiplicative hash): identical on pandas and
+    # cuDF, unlike DataFrame.sample() whose RNG differs between the two libraries.
+    h = ((pids["pid"].astype("int64") * 2654435761 + seed * 97) % 4294967296) / 4294967296.0
+    test_pids = pids[h < test_frac]
     df["is_test"] = df["pid"].isin(test_pids["pid"])
     is_seed = df["rank"] < n_seed
     train = df[~df["is_test"] | is_seed]

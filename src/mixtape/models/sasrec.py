@@ -189,6 +189,6 @@ class SASRec(Recommender):
             scores = self.net.logits(h).float()
             scores[:, 0] = -float("inf")
             for i, s in enumerate(batch):
-                scores[i, torch.as_tensor(s, device=self.device)] = -float("inf")
+                scores[i, torch.tensor(s, dtype=torch.long, device=self.device)] = -float("inf")
             out.append(scores.topk(k, dim=1).indices.cpu().numpy())
         return np.vstack(out)
