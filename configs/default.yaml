@@ -33,10 +33,14 @@ sasrec:
   heads: 2
   layers: 2
   dropout: 0.2
-  epochs: 30
+  epochs: 60
+  target_window: 5         # predict a random track among the next 5 (1 = classic next-item)
   batch_size: 256
   lr: 0.001
   n_neg: 16
+
+hybrid:
+  weights: [1.0, 0.5]      # [cooccur, sasrec] reciprocal-rank-fusion weights
 
 title:
   model: sentence-transformers/all-MiniLM-L6-v2

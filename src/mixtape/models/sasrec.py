@@ -61,7 +61,8 @@ class SASRec(Recommender):
     name = "sasrec"
 
     def __init__(self, max_len=50, dim=64, heads=2, layers=2, dropout=0.2, epochs=10,
-                 batch_size=256, lr=1e-3, n_neg=None, device=None, seed=42):
+                 batch_size=256, lr=1e-3, n_neg=None, target_window=1, device=None, seed=42):
+        self.target_window = target_window
         self.cfg = dict(max_len=max_len, dim=dim, heads=heads, layers=layers, dropout=dropout)
         self.epochs, self.batch_size, self.lr = epochs, batch_size, lr
         self.n_neg = n_neg  # None -> full softmax if catalogue is small, else 128 sampled
@@ -90,8 +91,7 @@ class SASRec(Recommender):
             for b in tqdm(range(0, len(order), self.batch_size), desc=f"epoch {epoch + 1}",
                           leave=False):
                 batch = torch.from_numpy(seqs[order[b:b + self.batch_size]]).to(self.device)
-                inp, tgt = batch[:, :-1], batch[:, 1:]
-                mask = tgt > 0
+                inp, tgt, mask = self._targets(batch)
                 with torch.autocast(self.device.type, enabled=use_amp):
                     h = self.net(inp)[mask]          # (N, dim) only real positions
                     t = tgt[mask]
@@ -116,6 +116,25 @@ class SASRec(Recommender):
             print(f"  epoch {epoch + 1}/{self.epochs}  loss={total / n:.4f}  "
                   f"({time.perf_counter() - t0:.1f}s on {self.device})")
         return self
+
+    def _targets(self, batch: torch.Tensor):
+        """Inputs, targets and mask for one batch of right-padded sequences.
+
+        target_window=1 is classic next-item SASRec. With window w, position i
+        is trained to predict a random track among the next w tracks, which
+        matches the task ("what else belongs in this playlist?") better than
+        predicting only the very next song.
+        """
+        inp = batch[:, :-1]
+        B, L = inp.shape
+        lens = (batch > 0).sum(1, keepdim=True)                      # (B, 1)
+        pos = torch.arange(L, device=batch.device).expand(B, L)
+        mask = pos < lens - 1
+        if self.target_window <= 1:
+            return inp, batch[:, 1:], mask
+        off = torch.randint(1, self.target_window + 1, (B, L), device=batch.device)
+        j = torch.minimum(pos + off, (lens - 1).clamp(min=0))
+        return inp, batch.gather(1, j), mask
 
     @torch.no_grad()
     def recommend(self, seeds: list[np.ndarray], k: int) -> np.ndarray:

@@ -74,6 +74,25 @@ def test_sasrec_runs(data):
     assert recs.shape == (len(data.seeds), 10)
 
 
+def test_sasrec_window_targets_stay_in_playlist():
+    m = SASRec(target_window=5, device="cpu")
+    batch = torch.tensor([[1, 2, 3, 4, 0, 0], [5, 6, 7, 8, 9, 10]])
+    inp, tgt, mask = m._targets(batch)
+    assert mask.sum().item() == 3 + 5
+    for row, t, mk in zip(batch, tgt, mask):
+        real = set(row[row > 0].tolist())
+        assert set(t[mk].tolist()) <= real
+    # each target comes strictly after its input position
+    assert (tgt[1][mask[1]] > inp[1][mask[1]]).all()
+
+
+def test_fuse_prefers_agreement():
+    from mixtape.models.hybrid import fuse
+    a = np.array([[1, 2, 3]])
+    b = np.array([[3, 4, 5]])
+    assert fuse([a, b], [1.0, 1.0], n_items=5, k=1)[0, 0] == 3
+
+
 def test_title_cold_start(data):
     tm = TitleRecommender(prefer_transformer=False).fit(data)
     recs = tm.recommend_titles(["gym 💪", "chill vibes"], 10)

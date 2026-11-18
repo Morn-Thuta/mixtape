@@ -47,6 +47,9 @@ def _build(name, cfg):
         return CoOccurrence(get_backend(), batch_size=cfg["cooccur"]["batch_size"])
     if name == "sasrec":
         return SASRec(**cfg["sasrec"])
+    if name == "hybrid":
+        from mixtape.models.hybrid import Hybrid
+        return Hybrid([_build("cooccur", cfg), _build("sasrec", cfg)], cfg["hybrid"]["weights"])
     raise ValueError(name)
 
 
@@ -151,7 +154,8 @@ def main(argv=None):
     ap.add_argument("command", choices=["synth", "ingest", "prep", "train", "graph",
                                         "bench", "demo", "all"])
     ap.add_argument("--config", default=None)
-    ap.add_argument("--models", nargs="+", default=["popularity", "cooccur", "sasrec", "title"])
+    ap.add_argument("--models", nargs="+",
+                    default=["popularity", "cooccur", "sasrec", "hybrid", "title"])
     ap.add_argument("--max-slices", type=int, default=None, help="ingest only N MPD slices")
     ap.add_argument("--title", default="rainy sunday")
     ap.add_argument("--k", type=int, default=10)

@@ -60,18 +60,24 @@ The synthetic generator (`data/synthetic.py`) writes the **exact same JSON forma
 |---|---|---:|---:|
 | Continuation (5 seed tracks) | popularity | 0.062 | 0.058 |
 | | co-occurrence | **0.398** | **0.402** |
-| | SASRec (30 epochs, RTX 3050) | 0.246 | 0.203 |
+| | SASRec, next-item, 30 epochs | 0.246 | 0.203 |
+| | SASRec, window-5 targets, 60 epochs | 0.310 | 0.284 |
+| | hybrid (co-occurrence + 0.25 × SASRec) | 0.398 | 0.400 |
 | Cold start (title only) | popularity | 0.069 | 0.071 |
 | | title encoder (TF-IDF) | **0.370** | **0.420** |
 
 Louvain recovered all 24 planted moods (modularity 0.87).
+
+**Reading these numbers.** The synthetic generator builds playlists mostly by sampling from a mood bucket, which is exactly what co-occurrence captures. The only order signal is a weak drift between sub-scenes, so SASRec and the hybrid can't beat co-occurrence here. Real playlists have stronger order effects (album runs, energy arcs), so the real comparison needs MPD data. Training SASRec to predict *any of the next 5 tracks*, instead of only the next one, raised its recall@50 from 0.25 to 0.31.
 
 ## Roadmap
 
 - [ ] Run on real MPD slices (start with 50, then all 1,000)
 - [ ] Fill the GPU column of the benchmark on Colab
 - [ ] Sentence-transformer title encoder vs TF-IDF
-- [ ] Close the SASRec gap: train on all next-k targets, not just next-1; longer training; tuning
-- [ ] Hybrid model: blend co-occurrence + SASRec + title scores
+- [x] SASRec future-window targets (`sasrec.target_window`) and longer training
+- [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec
+- [ ] Validation split + early stopping for SASRec (the low final loss suggests it memorises)
+- [ ] Add the title model to the hybrid for playlists with few seed tracks
 - [ ] Use cuGraph communities/PageRank as features
 - [ ] Small web demo (Streamlit): type a title or pick seed songs → playlist
