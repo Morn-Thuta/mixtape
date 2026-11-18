@@ -1,0 +1,42 @@
+{
+  "tfidf-char": {
+    "recall@50": 0.3743,
+    "ndcg@50": 0.4279,
+    "hit@50": 1.0,
+    "unseen_phrasing_mood_precision@50": 0.22,
+    "seconds": 2.0,
+    "unique_titles": 599
+  },
+  "sentence-transformers/all-MiniLM-L6-v2": {
+    "recall@50": 0.3182,
+    "ndcg@50": 0.3736,
+    "hit@50": 1.0,
+    "unseen_phrasing_mood_precision@50": 0.4708,
+    "seconds": 13.3,
+    "unique_titles": 599
+  },
+  "sentence-transformers/all-mpnet-base-v2": {
+    "recall@50": 0.3127,
+    "ndcg@50": 0.3656,
+    "hit@50": 0.999,
+    "unseen_phrasing_mood_precision@50": 0.5508,
+    "seconds": 3.2,
+    "unique_titles": 599
+  },
+  "hybrid(tfidf+all-MiniLM-L6-v2)": {
+    "recall@50": 0.3581,
+    "ndcg@50": 0.415,
+    "hit@50": 1.0,
+    "unseen_phrasing_mood_precision@50": 0.49,
+    "seconds": 2.1,
+    "unique_titles": 599
+  },
+  "hybrid(tfidf+all-mpnet-base-v2)": {
+    "recall@50": 0.3553,
+    "ndcg@50": 0.4137,
+    "hit@50": 1.0,
+    "unseen_phrasing_mood_precision@50": 0.5317,
+    "seconds": 2.8,
+    "unique_titles": 599
+  }
+}

@@ -80,6 +80,20 @@ Same code, same data; best of 3 passes per backend. Full tables: [reports/benchm
 
 Louvain recovered all 24 planted moods (modularity 0.87) on both CPU and GPU.
 
+### Title encoders: spelling vs meaning (cold start)
+
+`scripts/compare_title_encoders.py`. *Seen titles* are test playlists whose names also occur in training. *Unseen phrasings* are 24 hand-written queries that share no words with any training title (e.g. "marathon training" → running); the score is the share of the top 50 tracks that come from the right mood.
+
+| Encoder | Seen titles recall@50 | Unseen phrasings precision@50 |
+|---|---:|---:|
+| TF-IDF character n-grams | **0.374** | 0.220 |
+| all-MiniLM-L6-v2 | 0.318 | 0.471 |
+| all-mpnet-base-v2 | 0.313 | **0.551** |
+| TF-IDF + MiniLM | 0.358 | 0.490 |
+| **TF-IDF + MPNet (default)** | 0.355 | 0.532 |
+
+TF-IDF matches spelling, so it wins when the exact title was seen before but maps "late night drive" to "date night". Transformers match meaning and are 2.5× better on new phrasings. Concatenating both embeddings keeps most of each strength.
+
 **Reading these numbers.** The synthetic generator builds playlists mostly by sampling from a mood bucket, which is exactly what co-occurrence captures. The only order signal is a weak drift between sub-scenes, so SASRec and the hybrid can't beat co-occurrence here. Real playlists have stronger order effects (album runs, energy arcs), so the real comparison needs MPD data. Training SASRec to predict *any of the next 5 tracks*, instead of only the next one, plus early stopping, raised its recall@50 from 0.25 to 0.33.
 
 **Reproducibility.** The train/test split uses a deterministic hash of the playlist id, so pandas and cuDF hold out exactly the same playlists (`tests/test_gpu_parity.py` checks that both backends agree).
@@ -89,7 +103,7 @@ Louvain recovered all 24 planted moods (modularity 0.87) on both CPU and GPU.
 - [ ] Run on real MPD slices (start with 50, then all 1,000)
 - [x] Fill the GPU column of the benchmark (WSL2, RTX 3050), at 0.7M and 7M rows
 - [ ] Benchmark at full MPD scale (66M rows) on Colab T4 (16 GB)
-- [ ] Sentence-transformer title encoder vs TF-IDF
+- [x] Sentence-transformer title encoder vs TF-IDF (+ hybrid encoder, unseen-phrasing test)
 - [x] SASRec future-window targets (`sasrec.target_window`) and longer training
 - [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec
 - [x] Validation split + early stopping for SASRec (`sasrec.val_size`, `patience`)

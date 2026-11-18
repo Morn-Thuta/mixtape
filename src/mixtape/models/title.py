@@ -52,9 +52,31 @@ class _SentenceEncoder:
                                  convert_to_numpy=True, show_progress_bar=False)
 
 
+class _HybridEncoder:
+    """Concatenate L2-normalised TF-IDF and transformer vectors, each scaled by
+    sqrt(w), so the dot product is w_tfidf*cos_tfidf + w_st*cos_st: exact-wording
+    matches from TF-IDF plus meaning-level matches from the transformer."""
+
+    def __init__(self, model_name: str, w_tfidf: float = 0.5):
+        self.tfidf, self.st = _TfidfEncoder(), _SentenceEncoder(model_name)
+        self.a, self.b = np.sqrt(w_tfidf), np.sqrt(1 - w_tfidf)
+        self.name = f"hybrid(tfidf+{model_name.split('/')[-1]})"
+
+    def fit(self, texts):
+        self.tfidf.fit(texts)
+        return self
+
+    def encode(self, texts) -> np.ndarray:
+        return np.hstack([self.a * self.tfidf.encode(texts), self.b * self.st.encode(texts)])
+
+
 def make_encoder(model_name: str | None, prefer_transformer: bool = True):
+    """model_name: a sentence-transformers id, 'hybrid:<id>' to blend it with TF-IDF,
+    or None for TF-IDF only. Falls back to TF-IDF if sentence-transformers is missing."""
     if prefer_transformer and model_name:
         try:
+            if model_name.startswith("hybrid:"):
+                return _HybridEncoder(model_name.split(":", 1)[1])
             return _SentenceEncoder(model_name)
         except ImportError:
             print("  sentence-transformers not installed -> TF-IDF fallback "
