@@ -1,0 +1,52 @@
+paths:
+  raw: data/full/raw            # MPD json slices (or synthetic ones)
+  interim: data/full/interim    # flattened parquet
+  processed: data/full/processed
+  reports: reports/full
+
+synthetic:
+  n_playlists: 1000000
+  n_tracks: 400000
+  n_moods: 24
+  seed: 42
+
+prep:
+  min_track_count: 3       # drop tracks appearing in fewer playlists
+  min_playlist_len: 10
+  test_frac: 0.01         # 10k test playlists at full scale
+  n_seed: 5                # tracks given to the model; the rest are targets
+  seed: 42
+
+eval:
+  k: 50
+
+cooccur:
+  batch_size: 64
+
+graph:
+  top_n_tracks: 20000       # build the track graph over the most popular tracks
+  min_edge_weight: 3
+
+sasrec:
+  max_len: 50
+  dim: 64
+  heads: 2
+  layers: 2
+  dropout: 0.2
+  epochs: 150              # upper bound; early stopping usually ends sooner
+  target_window: 5         # predict a random track among the next 5 (1 = classic next-item)
+  val_size: 500            # training playlists held out for early stopping (0 = off)
+  eval_every: 5
+  patience: 3              # stop after 3 evaluations without improvement
+  batch_size: 256
+  lr: 0.001
+  n_neg: 128
+
+hybrid:
+  weights: [1.0, 0.5]      # [cooccur, sasrec] reciprocal-rank-fusion weights
+  title_weight: 1.0        # playlist-name model; 0 disables (see reports/hybrid_title.json)
+
+title:
+  # TF-IDF (exact wording) + MPNet (meaning); see reports/title_encoders.json
+  model: hybrid:sentence-transformers/all-mpnet-base-v2
+  top_m: 50                # similar training playlists to pool tracks from

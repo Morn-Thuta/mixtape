@@ -13,3 +13,5 @@ reports/*.pt
 reports/*.parquet
 data/large/
 reports/large/*.parquet
+data/full/
+reports/full/*.parquet

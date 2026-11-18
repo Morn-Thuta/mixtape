@@ -60,12 +60,21 @@ def generate(out_dir: Path, n_playlists=20_000, n_tracks=8_000, n_moods=24,
     track_artist = track_mood * 1000 + rng.integers(40, size=n_tracks)
     pop = 1.0 / (rng.permutation(n_tracks) + 1) ** 0.8
 
+    # Sampling uses precomputed CDFs + searchsorted: O(log n) per draw instead of
+    # rng.choice(p=...)'s O(n). It mirrors numpy's own choice() implementation
+    # (cdf = p.cumsum(); cdf /= cdf[-1]; side="right"), so output is unchanged.
+    def _cdf(p: np.ndarray) -> np.ndarray:
+        c = p.cumsum()
+        c /= c[-1]
+        return c
+
     buckets: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
     for m in range(n_moods):
         for s in range(n_sub):
             idx = np.where((track_mood == m) & (track_sub == s))[0]
             p = pop[idx] / pop[idx].sum()
-            buckets[(m, s)] = (idx, p)
+            buckets[(m, s)] = (idx, _cdf(p) if len(idx) else p)
+    global_cdf = _cdf(pop / pop.sum())
 
     def track_obj(t: int, pos: int) -> dict:
         return {
@@ -97,13 +106,13 @@ def generate(out_dir: Path, n_playlists=20_000, n_tracks=8_000, n_moods=24,
                     sub = (sub + rng.choice([-1, 1])) % n_sub
                 r = rng.random()
                 if r < 0.05:      # noise: any track by popularity
-                    t = int(rng.choice(n_tracks, p=pop / pop.sum()))
+                    t = int(global_cdf.searchsorted(rng.random(), side="right"))
                 else:
                     m = alt if (alt is not None and r < 0.25) else mood
-                    idx, p = buckets[(m, sub)]
+                    idx, cdf = buckets[(m, sub)]
                     if len(idx) == 0:
                         continue
-                    t = int(rng.choice(idx, p=p))
+                    t = int(idx[cdf.searchsorted(rng.random(), side="right")])
                 if t in seen:
                     continue
                 seen.add(t)
