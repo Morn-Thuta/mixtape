@@ -1,0 +1,2 @@
+# Streamlit demo (app/streamlit_app.py)
+streamlit>=1.40

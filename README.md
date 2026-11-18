@@ -33,6 +33,13 @@ python -m mixtape demo --title "rainy sunday"
 python -m pytest
 ```
 
+**Demo app**: build a playlist from a name, or continue one from songs you pick:
+
+```powershell
+pip install -r requirements-app.txt
+streamlit run app/streamlit_app.py
+```
+
 The code picks its backend automatically: **cuDF/CuPy/cuGraph when RAPIDS is installed, pandas/SciPy/networkx otherwise.** Force it with `MIXTAPE_BACKEND=cpu|gpu`. PyTorch (SASRec) uses CUDA whenever it's available, Windows included.
 
 ## GPU (RAPIDS) - Colab or WSL2
@@ -120,4 +127,4 @@ TF-IDF matches spelling, so it wins when the exact title was seen before but map
 - [x] Validation split + early stopping for SASRec (`sasrec.val_size`, `patience`)
 - [x] Add the title model to the hybrid for playlists with few seed tracks
 - [ ] Use cuGraph communities/PageRank as features
-- [ ] Small web demo (Streamlit): type a title or pick seed songs → playlist
+- [x] Small web demo (Streamlit): type a title or pick seed songs → playlist

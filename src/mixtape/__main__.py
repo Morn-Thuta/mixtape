@@ -104,6 +104,11 @@ def cmd_train(cfg, args):
             print(f"   {n}: {r}")
 
     out = cfg["paths"]["reports"] / "results.json"
+    if out.exists():  # merge, so training one model doesn't erase the others' results
+        with open(out) as f:
+            old = json.load(f)
+        for section in results:
+            results[section] = {**old.get(section, {}), **results[section]}
     with open(out, "w") as f:
         json.dump(results, f, indent=2)
     print(f"\nsaved {out}")
