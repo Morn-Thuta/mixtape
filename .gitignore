@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+# datasets & artifacts (large)
+data/raw/*
+data/interim/*
+data/processed/*
+!data/**/.gitkeep
+reports/*.pt
+reports/*.parquet

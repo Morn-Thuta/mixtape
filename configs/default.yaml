@@ -1,0 +1,43 @@
+paths:
+  raw: data/raw            # MPD json slices (or synthetic ones)
+  interim: data/interim    # flattened parquet
+  processed: data/processed
+  reports: reports
+
+synthetic:
+  n_playlists: 20000
+  n_tracks: 8000
+  n_moods: 24
+  seed: 42
+
+prep:
+  min_track_count: 3       # drop tracks appearing in fewer playlists
+  min_playlist_len: 10
+  test_frac: 0.05
+  n_seed: 5                # tracks given to the model; the rest are targets
+  seed: 42
+
+eval:
+  k: 50
+
+cooccur:
+  batch_size: 512
+
+graph:
+  top_n_tracks: 5000       # build the track graph over the most popular tracks
+  min_edge_weight: 3
+
+sasrec:
+  max_len: 50
+  dim: 64
+  heads: 2
+  layers: 2
+  dropout: 0.2
+  epochs: 30
+  batch_size: 256
+  lr: 0.001
+  n_neg: 16
+
+title:
+  model: sentence-transformers/all-MiniLM-L6-v2
+  top_m: 50                # similar training playlists to pool tracks from

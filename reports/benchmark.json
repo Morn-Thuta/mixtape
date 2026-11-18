@@ -1,0 +1,18 @@
+{
+  "rows": 696845,
+  "results": {
+    "cpu": {
+      "prep.read": 0.136,
+      "prep.filter_tracks": 0.1886,
+      "prep.filter_playlists": 0.0484,
+      "prep.index": 0.1835,
+      "prep.split": 0.0728,
+      "prep.write": 0.0906,
+      "prep.total": 0.7199,
+      "cooccur.fit": 0.0419,
+      "cooccur.recommend": 0.2723,
+      "graph.build": 0.249,
+      "graph.louvain+pagerank": 11.119
+    }
+  }
+}

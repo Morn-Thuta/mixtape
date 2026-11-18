@@ -1,0 +1,2 @@
+# Transformer title encoder (optional; TF-IDF fallback is used without it)
+sentence-transformers>=3.0

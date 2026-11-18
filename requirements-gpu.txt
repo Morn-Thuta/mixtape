@@ -1,0 +1,5 @@
+# RAPIDS GPU path (Linux / WSL2 / Colab only, CUDA 12)
+# pip install -r requirements-gpu.txt --extra-index-url=https://pypi.nvidia.com
+cudf-cu12>=24.12
+cugraph-cu12>=24.12
+cupy-cuda12x>=13
