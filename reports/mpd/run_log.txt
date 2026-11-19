@@ -1,0 +1,7 @@
+=== 2026-11-19T09:44:20+08:00 ===
+ingest         rc=0     536s  gpu_peak=1442MiB
+prep           rc=0      20s  gpu_peak=3919MiB
+train-all      rc=0   40826s  gpu_peak=3924MiB
+graph          rc=0      24s  gpu_peak=2160MiB
+=== 2026-11-19T21:37:47+08:00 ===
+graph          rc=0     237s  gpu_peak=3725MiB

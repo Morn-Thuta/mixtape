@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # Full-scale dress rehearsal on WSL2 + RAPIDS. Logs wall time, peak RAM (RSS) and
-# peak GPU memory per step to reports/full/run_log.txt.
-#   usage: bash scripts/full_scale_run.sh [step ...]   (default: all steps)
+# peak GPU memory per step to <reports>/run_log.txt.
+#   usage: [CFG=configs/mpd.yaml] bash scripts/full_scale_run.sh [step ...]
+#   steps: synth ingest prep train-cooccur graph train-sasrec train-all
 set -uo pipefail
 source ~/.venvs/mixtape/bin/activate
 cd "$(dirname "$0")/.."
-CFG=configs/full.yaml
-LOG=reports/full/run_log.txt
-mkdir -p reports/full
+CFG=${CFG:-configs/full.yaml}
+REPORTS=$(python -c "import yaml,sys; print(yaml.safe_load(open(sys.argv[1]))['paths']['reports'])" "$CFG")
+LOG=$REPORTS/run_log.txt
+mkdir -p "$REPORTS"
 STEPS=("${@:-synth ingest prep train-cooccur graph train-sasrec}")
 read -ra STEPS <<< "${STEPS[*]}"
 
@@ -45,6 +47,7 @@ for s in "${STEPS[@]}"; do
     train-cooccur) run_step cooccur train --config $CFG --models popularity cooccur ;;
     graph)         run_step graph graph --config $CFG ;;
     train-sasrec)  run_step sasrec train --config $CFG --models sasrec ;;
+    train-all)     run_step train-all train --config $CFG --models popularity cooccur sasrec hybrid title ;;
     *) echo "unknown step $s"; exit 2 ;;
   esac || { echo "step $s failed"; exit 1; }
 done

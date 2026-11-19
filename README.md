@@ -55,9 +55,9 @@ Then `python -m mixtape bench` fills both columns of `reports/benchmark.md`.
 ## Real data: Spotify Million Playlist Dataset
 
 1. Register and download the MPD from the AIcrowd *Spotify Million Playlist Dataset Challenge* page.
-2. Copy the `mpd.slice.*.json` files into `data/raw/` (and remove the synthetic ones).
-3. Start small: `python -m mixtape ingest --max-slices 50` (50k playlists), then `prep`, `train`.
-4. For the full 1M playlists, set `sasrec.n_neg: 128` (sampled softmax) so training fits in GPU memory.
+2. `python scripts/extract_mpd.py <zip>` extracts and md5-checks the slices into `data/mpd/raw/`.
+3. Start small: `bash scripts/run_mpd50.sh` (50 slices, `configs/mpd50.yaml`).
+4. Full 1M playlists: `CFG=configs/mpd.yaml bash scripts/full_scale_run.sh ingest prep train-all graph` (logs time, peak RAM and GPU memory per step). `sasrec.n_neg: 128` (sampled softmax) keeps training inside 4 GB.
 
 The synthetic generator (`data/synthetic.py`) writes the **exact same JSON format**, so nothing else changes.
 
@@ -72,6 +72,44 @@ Same code, same data; best of 3 passes per backend. Full tables: [reports/benchm
 | Louvain + PageRank (cuGraph) | 8.69 s → 0.30 s | 28.7× | 17.8 s → 0.37 s | **47.7×** |
 
 **The speedup grows with data size.** At 0.7M rows the GPU's fixed costs (kernel launches, host↔device copies) eat most of the gain, and a few tiny steps are even slower on GPU. At 7M rows the per-row work dominates and cuDF's group-bys and joins pull ahead (the track-filter step alone is 22.6× faster). The full MPD is 66M rows, about 10× larger again.
+
+## Results on the real Spotify Million Playlist Dataset
+
+All 1,000 slices: 66.3M rows → 63.4M after filtering, 857,746 tracks, 957,253 playlists, 9,549 held-out test playlists (first 5 tracks in, predict the rest; k=50). Everything ran on one 4 GB RTX 3050 Laptop GPU in WSL2. Raw numbers: [reports/mpd/results.json](reports/mpd/results.json), timings: [reports/mpd/run_log.txt](reports/mpd/run_log.txt).
+
+| Task | Model | recall@50 | ndcg@50 | hit@50 |
+|---|---|---:|---:|---:|
+| Continuation (5 seed tracks) | popularity | 0.024 | 0.034 | 0.387 |
+| | co-occurrence | 0.158 | 0.208 | 0.862 |
+| | SASRec (transformer) | 0.125 | 0.166 | 0.880 |
+| | **hybrid (co-occurrence + 0.5 × SASRec + 0.5 × title)** | **0.169** | **0.225** | **0.895** |
+| Cold start (title only) | popularity | 0.025 | 0.037 | 0.414 |
+| | **title encoder (TF-IDF + MPNet)** | **0.076** | **0.107** | **0.646** |
+
+- **The hybrid beats the best single model by 7% recall and 8% ndcg.** Its weights were tuned on validation playlists carved out of training (`scripts/tune_hybrid.py` on the 50-slice subset); the test set was never used for tuning.
+- **SASRec alone trails co-occurrence on recall, but it puts at least one correct track in the top 50 for more playlists (hit@50 0.880 vs 0.862).** That's because the two models get different playlists right, and that difference is what the fusion exploits.
+- **From the name alone, the title model finds 3× more of the playlist than popularity.**
+
+| Stage (full MPD, GPU) | Time | Peak GPU memory |
+|---|---:|---:|
+| Ingest (1,000 JSON slices → parquet) | 9 min | 1.4 GB |
+| Prep in cuDF (filter, index, split 66M rows) | 15 s | 3.9 GB |
+| Co-occurrence fit | 17 s | |
+| SASRec (early-stopped at epoch 50, best 35; ~12–17 min/epoch) | 10.8 h | 3.9 GB |
+
+**Track communities (cuGraph Louvain + PageRank, top 20k tracks, edges shared by ≥ 25 playlists: 11.5M edges).** The graph builds in 3.5 min and Louvain + PageRank take 16 s on the GPU. It splits into 10 communities (modularity 0.51) that line up with real scenes, even though the model never sees a genre label:
+
+| Community | Size | Most central tracks (PageRank) |
+|---|---:|---|
+| Pop / EDM | 7,004 | The Chainsmokers - Closer · The Chainsmokers - Roses · Vance Joy - Riptide |
+| Classic rock | 3,734 | Queen - Bohemian Rhapsody · Journey - Don't Stop Believin' · Lynyrd Skynyrd - Sweet Home Alabama |
+| Current hip-hop | 3,446 | Kendrick Lamar - HUMBLE. · Drake - One Dance · DRAM - Broccoli |
+| 2000s R&B / hip-hop | 2,458 | R. Kelly - Ignition (Remix) · Kanye West - Gold Digger · Usher - Yeah! |
+| Country | 1,397 | Sam Hunt - Body Like A Back Road · Thomas Rhett - Die A Happy Man · Zac Brown Band - Chicken Fried |
+
+The co-occurrence product is computed as dense, chunked cuBLAS matrix multiplies (`graph._upper_edges_gpu`). cuSPARSE SpGEMM would need a 21 GB scratch buffer at this scale.
+
+On the 50-slice subset (46k playlists) the same pipeline gives co-occurrence 0.155, tuned hybrid 0.164 recall@50, so more data helped every model, SASRec most (0.105 → 0.125).
 
 ## Model results (synthetic data, 20k playlists, k=50, prepared and trained on GPU)
 
@@ -118,7 +156,7 @@ TF-IDF matches spelling, so it wins when the exact title was seen before but map
 
 ## Roadmap
 
-- [ ] Run on real MPD slices (start with 50, then all 1,000)
+- [x] Run on real MPD slices (50, then all 1,000)
 - [x] Fill the GPU column of the benchmark (WSL2, RTX 3050), at 0.7M and 7M rows
 - [ ] Benchmark at full MPD scale (66M rows) on Colab T4 (16 GB)
 - [x] Sentence-transformer title encoder vs TF-IDF (+ hybrid encoder, unseen-phrasing test)

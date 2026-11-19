@@ -25,7 +25,7 @@ cooccur:
 
 graph:
   top_n_tracks: 20000       # build the track graph over the most popular tracks
-  min_edge_weight: 3
+  min_edge_weight: 25       # 20x the playlists of mpd50 (which uses 3); w>=3 gives 53M edges, too many for 4 GB
 
 sasrec:
   max_len: 50

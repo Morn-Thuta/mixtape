@@ -23,14 +23,39 @@ def build_edges(be: Backend, data: Dataset, top_n: int, min_w: int) -> pd.DataFr
     top = np.argsort(-pop)[:top_n]
     sub = tr[tr["item"].isin(top)]
     X = build_matrix(be, sub["pid"].to_numpy(), sub["item"].to_numpy(), data.n_items)
-    top_x = be.xp.asarray(np.sort(top))
-    Xt = X[:, top_x]
-    C = (Xt.T @ Xt).tocoo()
-    r, c, w = (be.to_numpy(a) for a in (C.row, C.col, C.data))
-    keep = (r < c) & (w >= min_w)
     top_sorted = np.sort(top)
-    return pd.DataFrame({"src": top_sorted[r[keep]], "dst": top_sorted[c[keep]],
-                         "weight": w[keep].astype(np.float32)})
+    Xt = X[:, be.xp.asarray(top_sorted)]
+    if be.is_gpu:
+        r, c, w = _upper_edges_gpu(Xt, min_w)
+    else:
+        C = (Xt.T @ Xt).tocoo()
+        r, c, w = C.row, C.col, C.data
+        keep = (r < c) & (w >= min_w)
+        r, c, w = r[keep], c[keep], w[keep]
+    return pd.DataFrame({"src": top_sorted[r], "dst": top_sorted[c],
+                         "weight": w.astype(np.float32)})
+
+
+def _upper_edges_gpu(Xt, min_w: int, chunk: int = 4096):
+    """Xt^T Xt as a dense matrix built from playlist chunks with cuBLAS.
+
+    cuSPARSE SpGEMM needs a scratch buffer proportional to the number of
+    intermediate products (sum of len^2 over playlists): ~21 GB on the full MPD,
+    far beyond a 4 GB card. A dense top_n x top_n accumulator (1.6 GB at 20k)
+    plus one dense chunk keeps memory bounded and is fast on tensor-free GPUs too.
+    """
+    import cupy as cp
+    n = Xt.shape[1]
+    C = cp.zeros((n, n), dtype=cp.float32)
+    for s in range(0, Xt.shape[0], chunk):
+        Xb = Xt[s:s + chunk].toarray()
+        C += Xb.T @ Xb
+        del Xb
+    C = cp.triu(C, k=1)
+    r, c = cp.nonzero(C >= min_w)
+    w = C[r, c]
+    del C
+    return cp.asnumpy(r), cp.asnumpy(c), cp.asnumpy(w)
 
 
 def analyze(be: Backend, data: Dataset, top_n=5000, min_w=3, seed=42) -> tuple[pd.DataFrame, dict]:

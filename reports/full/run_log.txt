@@ -7,3 +7,5 @@ cooccur        rc=1       9s  gpu_peak=0MiB
 === 2026-11-18T20:31:24+08:00 ===
 cooccur        rc=0      56s  gpu_peak=1929MiB
 graph          rc=0      35s  gpu_peak=3711MiB
+=== 2026-11-19T08:12:31+08:00 ===
+sasrec         rc=143     564s  gpu_peak=1735MiB
