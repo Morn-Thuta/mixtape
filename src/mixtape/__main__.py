@@ -36,7 +36,9 @@ def cmd_prep(cfg, args):
     print(json.dumps(stats, indent=2))
 
 
-def _build(name, cfg, tfidf: bool = False):
+def _build(name, cfg, tfidf: bool = False, fitted: dict | None = None):
+    """fitted: already-trained components by name, reused by the hybrid."""
+    fitted = fitted or {}
     from mixtape.backend import get_backend
     from mixtape.models.cooccur import CoOccurrence
     from mixtape.models.popularity import Popularity
@@ -55,8 +57,9 @@ def _build(name, cfg, tfidf: bool = False):
         if h.get("title_weight", 0) > 0:
             title = TitleRecommender(cfg["title"]["model"], cfg["title"]["top_m"],
                                      prefer_transformer=not tfidf)
-        return Hybrid([_build("cooccur", cfg), _build("sasrec", cfg)], h["weights"],
-                      title_model=title, title_weight=h.get("title_weight", 0))
+        parts = [fitted.get(n) or _build(n, cfg) for n in ("cooccur", "sasrec")]
+        return Hybrid(parts, h["weights"], title_model=title,
+                      title_weight=h.get("title_weight", 0))
     raise ValueError(name)
 
 
@@ -70,13 +73,16 @@ def cmd_train(cfg, args):
     k = cfg["eval"]["k"]
     print(f"items={data.n_items:,}  train rows={len(data.train):,}  test playlists={len(data.test_pids):,}")
     results = {"continuation": {}, "cold_start": {}}
+    fitted: dict = {}
 
     for name in args.models:
         if name == "title":
             continue
         print(f"\n[{name}] training...")
         t0 = time.perf_counter()
-        model = _build(name, cfg, tfidf=args.tfidf).fit(data)
+        model = _build(name, cfg, tfidf=args.tfidf, fitted=fitted).fit(data)
+        model.fitted_ = True
+        fitted[name] = model
         fit_s = time.perf_counter() - t0
         t0 = time.perf_counter()
         if name == "hybrid":

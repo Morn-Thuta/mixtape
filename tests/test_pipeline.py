@@ -111,6 +111,16 @@ def test_hybrid_with_title_excludes_seeds(data):
         assert not np.isin(r, s).any() and 0 not in r
 
 
+def test_with_validation_is_disjoint(data):
+    val = data.with_validation(20)
+    assert len(val.test_pids) == 20
+    assert not set(val.test_pids) & set(data.test_pids)
+    # validation targets are gone from train; their seeds stay
+    tr = val.train[val.train["pid"].isin(val.test_pids)]
+    assert (tr["rank"] < 5).all() and len(tr) == 5 * 20
+    assert all(len(s) == 5 and len(t) > 0 for s, t in zip(val.seeds, val.targets))
+
+
 def test_title_cold_start(data):
     tm = TitleRecommender(prefer_transformer=False).fit(data)
     recs = tm.recommend_titles(["gym 💪", "chill vibes"], 10)

@@ -28,11 +28,13 @@ class Hybrid(Recommender):
         self.depth, self.c = depth, c
 
     def fit(self, data: Dataset) -> "Hybrid":
+        """Fits only the components that aren't fitted yet (`fitted_` flag), so a
+        caller that already trained SASRec / co-occurrence can hand them in for free."""
         self.n_items = data.n_items
-        for m in self.models:
-            m.fit(data)
-        if self.title_model is not None:
-            self.title_model.fit(data)
+        for m in [*self.models, self.title_model]:
+            if m is not None and not getattr(m, "fitted_", False):
+                m.fit(data)
+                m.fitted_ = True
         return self
 
     def recommend(self, seeds: list[np.ndarray], k: int,

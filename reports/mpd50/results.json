@@ -1,0 +1,44 @@
+{
+  "continuation": {
+    "popularity": {
+      "recall@50": 0.0244,
+      "ndcg@50": 0.033,
+      "hit@50": 0.406,
+      "fit_s": 3.07,
+      "recommend_s": 0.05
+    },
+    "cooccur": {
+      "recall@50": 0.1545,
+      "ndcg@50": 0.1957,
+      "hit@50": 0.8326,
+      "fit_s": 1.91,
+      "recommend_s": 2.83
+    },
+    "sasrec": {
+      "recall@50": 0.1046,
+      "ndcg@50": 0.1271,
+      "hit@50": 0.7985,
+      "fit_s": 486.06,
+      "recommend_s": 0.5
+    },
+    "hybrid": {
+      "recall@50": 0.1487,
+      "ndcg@50": 0.1919,
+      "hit@50": 0.8469,
+      "fit_s": 490.6,
+      "recommend_s": 7.81
+    }
+  },
+  "cold_start": {
+    "popularity": {
+      "recall@50": 0.0253,
+      "ndcg@50": 0.0361,
+      "hit@50": 0.4262
+    },
+    "title (hybrid(tfidf+all-mpnet-base-v2))": {
+      "recall@50": 0.0584,
+      "ndcg@50": 0.0818,
+      "hit@50": 0.5768
+    }
+  }
+}
