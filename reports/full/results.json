@@ -1,0 +1,19 @@
+{
+  "continuation": {
+    "popularity": {
+      "recall@50": 0.0385,
+      "ndcg@50": 0.0366,
+      "hit@50": 0.6246,
+      "fit_s": 3.77,
+      "recommend_s": 0.19
+    },
+    "cooccur": {
+      "recall@50": 0.1557,
+      "ndcg@50": 0.1873,
+      "hit@50": 0.9429,
+      "fit_s": 8.25,
+      "recommend_s": 35.58
+    }
+  },
+  "cold_start": {}
+}

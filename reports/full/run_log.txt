@@ -4,3 +4,6 @@ ingest         rc=0     178s  gpu_peak=0MiB
 prep           rc=0      10s  gpu_peak=2215MiB
 === 2026-11-18T20:29:09+08:00 ===
 cooccur        rc=1       9s  gpu_peak=0MiB
+=== 2026-11-18T20:31:24+08:00 ===
+cooccur        rc=0      56s  gpu_peak=1929MiB
+graph          rc=0      35s  gpu_peak=3711MiB
