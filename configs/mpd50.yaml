@@ -43,8 +43,8 @@ sasrec:
   n_neg: 128
 
 hybrid:
-  weights: [1.0, 0.5]      # [cooccur, sasrec] reciprocal-rank-fusion weights
-  title_weight: 1.0        # playlist-name model; 0 disables (see reports/hybrid_title.json)
+  weights: [1.0, 0.5]      # [cooccur, sasrec], tuned on MPD validation (scripts/tune_hybrid.py)
+  title_weight: 0.5        # tuned on MPD validation playlists
 
 title:
   # TF-IDF (exact wording) + MPNet (meaning); see reports/title_encoders.json
