@@ -80,6 +80,19 @@ Same code, same data; best of 3 passes per backend. Full tables: [reports/benchm
 | Co-occurrence scoring (CuPy sparse) | 0.32 s → 0.18 s | 1.8× | 32.7 s → 8.5 s | **3.9×** |
 | Louvain + PageRank (cuGraph) | 8.69 s → 0.30 s | 28.7× | 17.8 s → 0.37 s | **47.7×** |
 
+**Full MPD (63.4M rows after filtering), same laptop:** [reports/mpd/benchmark.md](reports/mpd/benchmark.md). There was 1 CPU pass (it needs 7.3 GB of WSL's 7.6 GB of RAM) and the best of 2 GPU passes. Recommendation is timed on 2,000 test playlists, and the graph is built from the top 5,000 tracks, because networkx can't hold the 11.5M-edge top-20k graph.
+
+| Stage | CPU (pandas / SciPy / networkx) | GPU (cuDF / CuPy / cuGraph) | speedup |
+|---|---:|---:|---:|
+| Data prep, total | 88.7 s | 12.7 s | **7.0×** |
+| ↳ filter rare tracks (group-by + join) | 44.6 s | 0.91 s | **48.9×** |
+| Co-occurrence recommend (2k playlists) | 63.3 s | 33.9 s | 1.9× |
+| Louvain + PageRank | 118.2 s | 3.3 s | **36.1×** |
+| Co-occurrence fit | 6.1 s | 16.7 s | 0.4× |
+| Graph build | 19.2 s | 25.4 s | 0.8× |
+
+Two stages are slower on the GPU, and both are memory trade-offs of the 4 GB card. The co-occurrence fit builds its index on the CPU and then copies a 63M-entry sparse matrix to the GPU. The graph build swaps sparse SpGEMM, which needs a 21 GB scratch buffer, for chunked dense products. On a 16 GB GPU both could stay sparse and on-device.
+
 **The speedup grows with data size.** At 0.7M rows the GPU's fixed costs (kernel launches, host↔device copies) eat most of the gain, and a few tiny steps are even slower on GPU. At 7M rows the per-row work dominates and cuDF's group-bys and joins pull ahead (the track-filter step alone is 22.6× faster). The full MPD is 66M rows, about 10× larger again.
 
 ## Results on the real Spotify Million Playlist Dataset
@@ -167,7 +180,8 @@ TF-IDF matches spelling, so it wins when the exact title was seen before but map
 
 - [x] Run on real MPD slices (50, then all 1,000)
 - [x] Fill the GPU column of the benchmark (WSL2, RTX 3050), at 0.7M and 7M rows
-- [ ] Benchmark at full MPD scale (66M rows) on Colab T4 (16 GB)
+- [x] Benchmark at full MPD scale (63M rows) on the 4 GB laptop GPU
+- [ ] Re-run the full benchmark on a 16 GB GPU (Colab T4) with sparse, on-device co-occurrence and graph build
 - [x] Sentence-transformer title encoder vs TF-IDF (+ hybrid encoder, unseen-phrasing test)
 - [x] SASRec future-window targets (`sasrec.target_window`) and longer training
 - [x] Hybrid model: reciprocal rank fusion of co-occurrence + SASRec

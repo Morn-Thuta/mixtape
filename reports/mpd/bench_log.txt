@@ -1,0 +1,55 @@
+=== 2026-11-19T22:08:08+08:00 ===
+[bench] backend=cpu pass 1/1
+  prep 88.7s
+  cooccur fit 6.1s, recommend 63.3s
+  graph build 19.2s, louvain+pagerank 118.2s (4,690,745 edges)
+[bench] backend=gpu pass 1/2
+  prep 14.8s
+  cooccur fit 18.0s, recommend 33.9s
+  graph build 30.5s, louvain+pagerank 7.2s (4,690,745 edges)
+[bench] backend=gpu pass 2/2
+  prep 12.7s
+  cooccur fit 16.7s, recommend 36.7s
+  graph build 25.4s, louvain+pagerank 3.3s (4,690,745 edges)
+# CPU vs GPU benchmark (63,444,639 interactions)
+
+Best of 1 CPU / 2 GPU passes. `cooccur.recommend` times 2,000 test playlists. The graph uses the top 5,000 tracks, edges with weight ≥ 25.
+
+| stage | CPU (s) | GPU (s) | speedup |
+|---|---:|---:|---:|
+| prep.read | 1.877 | 1.5821 | 1.2x |
+| prep.filter_tracks | 44.613 | 0.9124 | 48.9x |
+| prep.filter_playlists | 3.052 | 0.2679 | 11.4x |
+| prep.index | 18.484 | 5.1484 | 3.6x |
+| prep.split | 10.064 | 2.3767 | 4.2x |
+| prep.write | 10.564 | 2.4487 | 4.3x |
+| prep.total | 88.653 | 12.7362 | 7.0x |
+| cooccur.fit | 6.082 | 16.7399 | 0.4x |
+| cooccur.recommend | 63.301 | 33.9374 | 1.9x |
+| graph.build | 19.244 | 25.433 | 0.8x |
+| graph.louvain+pagerank | 118.152 | 3.277 | 36.1x |
+
+	Command being timed: "python -u -m mixtape bench --config configs/mpd.yaml"
+	User time (seconds): 367.44
+	System time (seconds): 119.53
+	Percent of CPU this job got: 92%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 8:44.29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 7259456
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 8899
+	Minor (reclaiming a frame) page faults: 7668261
+	Voluntary context switches: 165770
+	Involuntary context switches: 1279
+	Swaps: 0
+	File system inputs: 2125568
+	File system outputs: 0
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+exit=0

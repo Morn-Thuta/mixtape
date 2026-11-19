@@ -27,6 +27,13 @@ graph:
   top_n_tracks: 20000       # build the track graph over the most popular tracks
   min_edge_weight: 25       # 20x the playlists of mpd50 (which uses 3); w>=3 gives 53M edges, too many for 4 GB
 
+bench:                     # full-scale CPU vs GPU (python -m mixtape bench --config configs/mpd.yaml)
+  repeats_cpu: 1           # one CPU pass takes long enough; GPU keeps best-of-2 (first pass warms up CUDA)
+  repeats_gpu: 2
+  n_recommend: 2000        # time co-occurrence recommendation on 2k test playlists
+  graph_top_n: 5000        # networkx can't hold the 11.5M-edge top-20k graph in WSL's 7.6 GB
+  graph_min_edge_weight: 25
+
 sasrec:
   max_len: 50
   dim: 64
