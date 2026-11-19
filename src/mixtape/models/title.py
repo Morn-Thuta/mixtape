@@ -7,7 +7,9 @@
 """
 from __future__ import annotations
 
+import hashlib
 import re
+from pathlib import Path
 
 import numpy as np
 import scipy.sparse as sps
@@ -95,13 +97,35 @@ def make_encoder(model_name: str | None, prefer_transformer: bool = True):
     return _TfidfEncoder()
 
 
+def _encode_cached(encoder, texts: np.ndarray, cache_dir: Path | None):
+    """encoder.encode(texts), loading/saving the transformer part from cache_dir.
+    The cache key covers the model name and the exact list of titles."""
+    st = encoder.st if isinstance(encoder, _HybridEncoder) else encoder
+    if cache_dir is None or not isinstance(st, _SentenceEncoder):
+        return encoder.encode(texts)
+    h = hashlib.sha1(st.name.encode())
+    h.update("\n".join(texts.tolist()).encode())
+    path = Path(cache_dir) / f"title_emb_{h.hexdigest()[:16]}.npy"
+    if path.exists():
+        dense = np.load(path).astype(np.float32)
+    else:
+        dense = st.encode(texts)
+        np.save(path, dense.astype(np.float16))
+    if isinstance(encoder, _HybridEncoder):
+        return encoder.tfidf.encode(texts), dense
+    return dense
+
+
 class TitleRecommender:
     name = "title"
 
     def __init__(self, model_name: str | None = None, top_m: int = 50, prefer_transformer=True):
         self.model_name, self.top_m, self.prefer_transformer = model_name, top_m, prefer_transformer
 
-    def fit(self, data: Dataset) -> "TitleRecommender":
+    def fit(self, data: Dataset, cache_dir: Path | None = None) -> "TitleRecommender":
+        """cache_dir: where to keep the transformer embeddings of the training titles.
+        Encoding ~100k titles with MPNet takes seconds on a GPU but ~15 min on a CPU,
+        so the demo app reuses embeddings computed once on the GPU."""
         tr = data.train_only
         pids = tr["pid"].unique()
         norm = np.array([normalize(data.titles.get(p, "")) for p in pids])
@@ -117,7 +141,7 @@ class TitleRecommender:
         sums = np.asarray(self.T.sum(1)).ravel()
         self.T = sps.diags(1.0 / np.maximum(sums, 1)) @ self.T
         self.encoder = make_encoder(self.model_name, self.prefer_transformer).fit(self.uniq)
-        self.E = self.encoder.encode(self.uniq)
+        self.E = _encode_cached(self.encoder, self.uniq, cache_dir)
         return self
 
     def recommend_titles(self, titles: list[str], k: int,

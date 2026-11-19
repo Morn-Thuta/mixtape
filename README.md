@@ -33,12 +33,21 @@ python -m mixtape demo --title "rainy sunday"
 python -m pytest
 ```
 
-**Demo app**: build a playlist from a name, or continue one from songs you pick:
+**Demo app** (Streamlit, runs on a plain CPU). It has three tabs:
+- **From a name:** type any playlist name and get tracks.
+- **From songs:** pick a few of the 20k most popular tracks and get a continuation (co-occurrence, optionally fused with a name).
+- **Scenes:** browse the cuGraph communities.
 
 ```powershell
-pip install -r requirements-app.txt
+pip install -r requirements-app.txt -r requirements-nlp.txt
 streamlit run app/streamlit_app.py
 ```
+
+The app uses the full MPD automatically once `data/mpd/processed` exists, otherwise the synthetic data; override with `MIXTAPE_CONFIG=configs/<name>.yaml`. For the MPD, first run `python scripts/build_demo_cache.py` on the GPU: it embeds all 16,976 unique playlist names with MPNet in 36 s, which would take ~15 min on a CPU. The app then loads in ~3–4 min on a laptop CPU (~5 GB RAM). Examples on the real data:
+- "late night drive" → Kavinsky *Nightcall* and Electric Youth *A Real Hero*, both from the *Drive* soundtrack.
+- Bon Iver + Fleet Foxes as seeds → *Skinny Love*, *Mykonos*, Ben Howard.
+
+SASRec isn't in the live demo: it's evaluated offline, since its 10.8 h training run isn't checkpointed.
 
 The code picks its backend automatically: **cuDF/CuPy/cuGraph when RAPIDS is installed, pandas/SciPy/networkx otherwise.** Force it with `MIXTAPE_BACKEND=cpu|gpu`. PyTorch (SASRec) uses CUDA whenever it's available, Windows included.
 
@@ -97,7 +106,7 @@ All 1,000 slices: 66.3M rows → 63.4M after filtering, 857,746 tracks, 957,253 
 | Co-occurrence fit | 17 s | |
 | SASRec (early-stopped at epoch 50, best 35; ~12–17 min/epoch) | 10.8 h | 3.9 GB |
 
-**Track communities (cuGraph Louvain + PageRank, top 20k tracks, edges shared by ≥ 25 playlists: 11.5M edges).** The graph builds in 3.5 min and Louvain + PageRank take 16 s on the GPU. It splits into 10 communities (modularity 0.51) that line up with real scenes, even though the model never sees a genre label:
+**Track communities (cuGraph Louvain + PageRank, top 20k tracks, edges shared by ≥ 25 playlists: 11.5M edges).** The graph builds in 3.5 min and Louvain + PageRank take 16 s on the GPU. It splits into 10 communities (modularity 0.51) that line up with real scenes, even though the model never sees a genre label. The five largest are below; the smaller five are Latin (J Balvin, Don Omar), worship (Hillsong), Broadway (Hamilton, Wicked), Christmas (Michael Bublé, Bing Crosby) and K-pop (BTS, EXO).
 
 | Community | Size | Most central tracks (PageRank) |
 |---|---:|---|
