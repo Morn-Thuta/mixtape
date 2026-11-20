@@ -61,7 +61,15 @@ def choose_mode() -> tuple[str, str]:
     if (LITE / "stats.json").exists():
         return "lite", str(LITE)
     mpd = ROOT / "data" / "mpd" / "processed" / "train.parquet"
-    return "full", str(ROOT / "configs" / ("mpd.yaml" if mpd.exists() else "default.yaml"))
+    if mpd.exists():
+        return "full", str(ROOT / "configs" / "mpd.yaml")
+    if (ROOT / "data" / "processed" / "train.parquet").exists():
+        return "full", str(ROOT / "configs" / "default.yaml")
+    st.error("No playlist data found. On a hosted copy, set the secrets `MIXTAPE_DATA_REPO` "
+             "(the private Hugging Face dataset holding `lite/`) and `HF_TOKEN` (a read token), "
+             "then reboot the app. Locally, run `python -m mixtape all` (synthetic data) or "
+             "`python -m mixtape lite` after preparing the MPD.")
+    st.stop()
 
 
 @st.cache_resource(show_spinner="Loading playlists and models…")
