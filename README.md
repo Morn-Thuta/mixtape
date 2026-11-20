@@ -2,6 +2,8 @@
 
 **GPU-accelerated playlist continuation**: given the first few songs of a playlist (or just its title), predict what comes next.
 
+**Live demo: [mixtapepicker.streamlit.app](https://mixtapepicker.streamlit.app)** (lite mode, built from all 1M playlists of the Spotify Million Playlist Dataset)
+
 Built to combine two NVIDIA DLI skill sets:
 
 | Part | What it does | Skill |
