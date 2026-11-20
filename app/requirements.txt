@@ -1,0 +1,10 @@
+# Hosted lite demo (Streamlit Community Cloud reads this file next to the app).
+# No PyTorch / RAPIDS: the lite bundle is precomputed (python -m mixtape lite).
+numpy
+pandas
+pyarrow
+scipy
+pyyaml
+streamlit>=1.40
+model2vec>=0.4
+huggingface_hub>=0.25

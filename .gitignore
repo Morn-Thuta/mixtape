@@ -19,3 +19,6 @@ data/mpd/
 reports/mpd/*.parquet
 data/mpd50/
 reports/mpd50/*.parquet
+
+data/space_bundle/
+data/lite/

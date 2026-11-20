@@ -1,0 +1,28 @@
+{
+  "bundle": {
+    "tracks": 857746,
+    "playlists": 957253,
+    "lite_items": 100000,
+    "k_neighbours": 100,
+    "k_title": 200,
+    "static_model": "minishlab/potion-base-8M",
+    "build_s": 211.7
+  },
+  "results": {
+    "lite cooccur": {
+      "recall@50": 0.1476,
+      "ndcg@50": 0.1975,
+      "hit@50": 0.8515
+    },
+    "lite cooccur + title (0.5)": {
+      "recall@50": 0.1515,
+      "ndcg@50": 0.2033,
+      "hit@50": 0.86
+    },
+    "lite title cold start": {
+      "recall@50": 0.0664,
+      "ndcg@50": 0.0932,
+      "hit@50": 0.5884
+    }
+  }
+}

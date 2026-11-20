@@ -128,6 +128,21 @@ def test_title_cold_start(data):
     assert tm.similar_titles("GYM!!")[0][0] == "gym"
 
 
+def test_lite_cooccur_matches_full_ranking(data, tmp_path):
+    """The precomputed item-kNN must exclude seeds and agree with the full model's top picks."""
+    from mixtape.lite import LiteCooccur, _neighbours
+    pop = np.bincount(data.train["item"].to_numpy(), minlength=data.n_items + 1).astype(np.int32)
+    items = np.arange(1, data.n_items + 1)
+    nb, sc = _neighbours(data.train_only, items, data.n_items, k_nb=data.n_items - 1)
+    np.savez(tmp_path / "co.npz", items=items.astype(np.int32), nb=nb, sc=sc)
+    lite = LiteCooccur(tmp_path / "co.npz", data.n_items, pop).recommend(data.seeds, 10)
+    full = CoOccurrence(get_backend("cpu")).fit(data).recommend(data.seeds, 10)
+    for r, s in zip(lite, data.seeds):
+        assert not np.isin(r, s).any() and 0 not in r
+    overlap = np.mean([len(set(a) & set(b)) / 10 for a, b in zip(lite, full)])
+    assert overlap > 0.8  # same cosine scores; only float16 rounding differs
+
+
 def test_graph(data):
     nodes, summary = analyze(get_backend("cpu"), data, top_n=200, min_w=2)
     assert summary["communities"] >= 2 and len(nodes) > 0

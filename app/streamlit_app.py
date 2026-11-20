@@ -5,40 +5,81 @@ Run from the repo root:
     pip install -r requirements-app.txt -r requirements-nlp.txt
     streamlit run app/streamlit_app.py
 
-Uses the real Spotify MPD (configs/mpd.yaml) when it has been prepared, else the
-synthetic data. Override with MIXTAPE_CONFIG=configs/<name>.yaml. For the MPD, run
-`python scripts/build_demo_cache.py` once on the GPU so the app doesn't spend
-~15 min encoding 100k playlist titles with MPNet on the CPU.
+Two modes:
+* full: the prepared Spotify MPD (configs/mpd.yaml) or the synthetic data, models fitted
+  at start-up (~5 GB RAM for the MPD). Run `python scripts/build_demo_cache.py` once on
+  the GPU first so MPNet doesn't encode every playlist title on the CPU.
+* lite: a precomputed bundle in data/lite (`python -m mixtape lite`, ~1 GB RAM), used
+  when it exists. Hosted copies set MIXTAPE_DATA_REPO (a private Hugging Face dataset
+  holding lite/*) and HF_TOKEN, and the bundle is downloaded on first start.
+MIXTAPE_CONFIG=configs/<name>.yaml forces full mode with that config.
 """
 from __future__ import annotations
 
 import os
+import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from mixtape.backend import get_backend
-from mixtape.config import ROOT, load_config
-from mixtape.data.dataset import load_dataset
-from mixtape.models.cooccur import CoOccurrence
-from mixtape.models.hybrid import fuse
-from mixtape.models.title import TitleRecommender
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))  # hosted copies run from a checkout without installing
+
+from mixtape.models.hybrid import fuse  # noqa: E402
 
 st.set_page_config(page_title="mixtape", page_icon="🎧", layout="wide")
 N_PICKABLE = 20_000  # most popular tracks offered in the song picker
+LITE = ROOT / "data" / "lite"
 
 
-def default_config() -> str:
+def _secret(name: str) -> str | None:
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        return st.secrets.get(name)
+    except Exception:  # no secrets file
+        return None
+
+
+def fetch_lite() -> None:
+    """Hosted deployment: download the lite bundle from the private dataset repo."""
+    repo = _secret("MIXTAPE_DATA_REPO")
+    if not repo or (LITE / "stats.json").exists():
+        return
+    from huggingface_hub import snapshot_download
+    with st.spinner("Downloading the playlist data (first start only)…"):
+        snapshot_download(repo, repo_type="dataset", allow_patterns=["lite/*"],
+                          local_dir=ROOT / "data", token=_secret("HF_TOKEN"))
+
+
+def choose_mode() -> tuple[str, str]:
     if os.environ.get("MIXTAPE_CONFIG"):
-        return os.environ["MIXTAPE_CONFIG"]
+        return "full", os.environ["MIXTAPE_CONFIG"]
+    fetch_lite()
+    if (LITE / "stats.json").exists():
+        return "lite", str(LITE)
     mpd = ROOT / "data" / "mpd" / "processed" / "train.parquet"
-    return str(ROOT / "configs" / ("mpd.yaml" if mpd.exists() else "default.yaml"))
+    return "full", str(ROOT / "configs" / ("mpd.yaml" if mpd.exists() else "default.yaml"))
 
 
-@st.cache_resource(show_spinner="Loading playlists and fitting models (≈3–4 min on a CPU for the full MPD, once)…")
-def load(config: str, tfidf_only: bool):
-    cfg = load_config(config)
+@st.cache_resource(show_spinner="Loading playlists and models…")
+def load(mode: str, where: str, tfidf_only: bool):
+    """Returns (info, names, co, tm, pop, scenes_path); co / tm share one interface in
+    both modes: co.recommend(seeds, k), tm.recommend_titles(...), tm.similar_titles(...)."""
+    if mode == "lite":
+        from mixtape.lite import load_lite
+        stats, names, co, tm, pop = load_lite(Path(where))
+        info = {**stats, "title_weight": 0.5, "label": "lite (precomputed from all playlists)"}
+        return info, names, co, tm, pop, str(Path(where) / "graph_nodes.parquet")
+
+    from mixtape.backend import get_backend
+    from mixtape.config import load_config
+    from mixtape.data.dataset import load_dataset
+    from mixtape.models.cooccur import CoOccurrence
+    from mixtape.models.title import TitleRecommender
+    cfg = load_config(where)
     data = load_dataset(cfg["paths"]["processed"])
     tracks = pd.read_parquet(cfg["paths"]["interim"] / "tracks.parquet",
                              columns=["tid", "track_name", "artist_name"])
@@ -48,19 +89,21 @@ def load(config: str, tfidf_only: bool):
     tm = TitleRecommender(cfg["title"]["model"], cfg["title"]["top_m"],
                           prefer_transformer=not tfidf_only).fit(data, cache_dir=cfg["paths"]["processed"])
     pop = np.bincount(data.train["item"].to_numpy(), minlength=data.n_items + 1)
-    stats = {"tracks": data.n_items, "playlists": int(data.train["pid"].nunique())}
-    return cfg, stats, names, co, tm, pop
+    info = {"tracks": data.n_items, "playlists": int(data.train["pid"].nunique()),
+            "title_weight": cfg["hybrid"].get("title_weight", 0.5),
+            "label": f"full · {os.path.basename(where)} · {get_backend().name}"}
+    return info, names, co, tm, pop, str(cfg["paths"]["reports"] / "graph_nodes.parquet")
 
 
 @st.cache_resource(show_spinner=False)
-def load_scenes(config: str, _cfg, _names):
+def load_scenes(path: str, _names):
     """Louvain communities from `python -m mixtape graph`, named after their three most
     central artists (summed PageRank of their tracks): one artist alone can mislabel a
     big mixed community."""
-    path = _cfg["paths"]["reports"] / "graph_nodes.parquet"
-    if not path.exists():
+    if not Path(path).exists():
         return None
     nodes = pd.read_parquet(path, columns=["item", "community", "pagerank"])
+    nodes = nodes[nodes["item"].isin(_names.index)]
     nodes["artist"] = _names["artist_name"].reindex(nodes["item"]).to_numpy()
     size = nodes["community"].value_counts()
     by_artist = nodes.groupby(["community", "artist"])["pagerank"].sum().reset_index() \
@@ -72,6 +115,7 @@ def load_scenes(config: str, _cfg, _names):
 
 
 def show(items: np.ndarray, names: pd.DataFrame, pop: np.ndarray, scenes) -> None:
+    items = np.asarray([i for i in items if i in names.index], dtype=np.int64)
     df = names.loc[items, ["artist_name", "track_name"]].reset_index(drop=True)
     df.columns = ["Artist", "Track"]
     df.index += 1
@@ -82,24 +126,23 @@ def show(items: np.ndarray, names: pd.DataFrame, pop: np.ndarray, scenes) -> Non
 
 
 st.title("🎧 mixtape")
-st.caption("Playlist continuation on the Spotify Million Playlist Dataset · RAPIDS (cuDF, cuGraph) + transformers")
-config = default_config()
-tfidf_only = st.sidebar.toggle("TF-IDF only (no transformer)", value=False)
+st.caption("Playlist continuation on the Spotify Million Playlist Dataset · RAPIDS (cuDF, cuGraph) + transformers · "
+           "[code and results](https://github.com/Morn-Thuta/mixtape)")
+mode, where = choose_mode()
+tfidf_only = mode == "full" and st.sidebar.toggle("TF-IDF only (no transformer)", value=False)
 k = st.sidebar.slider("Songs to recommend", 5, 50, 20)
-cfg, stats, names, co, tm, pop = load(config, tfidf_only)
-scenes = load_scenes(config, cfg, names)
+info, names, co, tm, pop, scenes_path = load(mode, where, tfidf_only)
+scenes = load_scenes(scenes_path, names)
 st.sidebar.markdown(
-    f"**Data:** `{os.path.basename(config)}`  \n**Tracks:** {stats['tracks']:,}  \n"
-    f"**Playlists:** {stats['playlists']:,}  \n**Backend:** {get_backend().name}  \n"
-    f"**Title encoder:** {tm.encoder.name}")
+    f"**Mode:** {info['label']}  \n**Tracks:** {info['tracks']:,}  \n"
+    f"**Playlists:** {info['playlists']:,}  \n**Title encoder:** {tm.encoder.name}")
 st.sidebar.caption("Live demo uses co-occurrence + the title model, fused by reciprocal rank. "
                    "SASRec is evaluated offline (reports/mpd/results.json).")
 
 tabs = st.tabs(["✍️ From a name", "🎵 From songs"] + (["🗺️ Scenes"] if scenes is not None else []))
 
 with tabs[0]:
-    st.write("Type any playlist name, even one nobody used: the transformer matches meaning, "
-             "TF-IDF matches spelling.")
+    st.write("Type any playlist name, even one nobody used: the encoder matches meaning, not just spelling.")
     title = st.text_input("Name your playlist", "late night drive")
     if title:
         st.write("Closest playlist names among 1M real playlists: "
@@ -108,7 +151,8 @@ with tabs[0]:
 
 with tabs[1]:
     order = np.argsort(-pop)
-    pickable = names.loc[order[order > 0][:N_PICKABLE]]
+    order = order[(order > 0) & np.isin(order, names.index)][:N_PICKABLE]
+    pickable = names.loc[order]
     picked = st.multiselect(f"Pick a few songs (search the {N_PICKABLE:,} most popular)",
                             pickable["label"].tolist(), max_selections=10)
     name_hint = st.text_input("Optional: playlist name, blended in with rank fusion", "")
@@ -117,8 +161,8 @@ with tabs[1]:
         lists, weights = [co.recommend([seed], 200)], [1.0]
         if name_hint:
             lists.append(tm.recommend_titles([name_hint], 200, exclude=[seed]))
-            weights.append(cfg["hybrid"].get("title_weight", 0.5))
-        show(fuse(lists, weights, stats["tracks"], k)[0], names, pop, scenes)
+            weights.append(info["title_weight"])
+        show(fuse(lists, weights, info["tracks"], k)[0], names, pop, scenes)
     else:
         st.info("Pick at least one song to get recommendations.")
 

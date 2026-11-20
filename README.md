@@ -43,7 +43,14 @@ pip install -r requirements-app.txt -r requirements-nlp.txt
 streamlit run app/streamlit_app.py
 ```
 
-The app uses the full MPD automatically once `data/mpd/processed` exists, otherwise the synthetic data; override with `MIXTAPE_CONFIG=configs/<name>.yaml`. For the MPD, first run `python scripts/build_demo_cache.py` on the GPU: it embeds all 16,976 unique playlist names with MPNet in 36 s, which would take ~15 min on a CPU. The app then loads in ~3–4 min on a laptop CPU (~5 GB RAM). Examples on the real data:
+The app runs in one of two modes:
+
+- **Lite mode** (used for the hosted demo, ~430 MB RAM, starts in seconds). `python -m mixtape lite` precomputes, from all 1M playlists:
+    - the 100 nearest songs of each of the 100k most popular songs, using the same cosine score as the full co-occurrence model;
+    - the 200 most common songs of each unique playlist name;
+    - name embeddings from the static model2vec model `potion-base-8M`, so no PyTorch is needed.
+  The bundle is 67 MB. On the 9,549 test playlists it keeps most of the full models' accuracy ([reports/mpd/lite_results.json](reports/mpd/lite_results.json)): co-occurrence 0.148 recall@50 (full 0.158), co-occurrence + title 0.152, and title-only cold start 0.066 (full 0.076). The hosted copy downloads the bundle from a private Hugging Face dataset (`MIXTAPE_DATA_REPO` + `HF_TOKEN` secrets), because the Spotify data can't be re-shared. Its dependencies are in `app/requirements.txt`.
+- **Full mode** (`MIXTAPE_CONFIG=configs/<name>.yaml`, or when there is no `data/lite`). It uses the full MPD once `data/mpd/processed` exists, otherwise the synthetic data. For the MPD, first run `python scripts/build_demo_cache.py` on the GPU: it embeds all 16,976 unique playlist names with MPNet in 36 s, which would take ~15 min on a CPU. The app then loads in ~3–4 min on a laptop CPU (~5 GB RAM). Examples on the real data:
 - "late night drive" → Kavinsky *Nightcall* and Electric Youth *A Real Hero*, both from the *Drive* soundtrack.
 - Bon Iver + Fleet Foxes as seeds → *Skinny Love*, *Mykonos*, Ben Howard.
 

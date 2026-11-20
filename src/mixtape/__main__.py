@@ -163,6 +163,12 @@ def cmd_demo(cfg, args):
         print(f"{i:2d}. {r['artist_name']} - {r['track_name']}")
 
 
+def cmd_lite(cfg, args):
+    from mixtape.config import ROOT
+    from mixtape.lite import build_lite
+    print(json.dumps(build_lite(cfg, ROOT / "data" / "lite"), indent=2))
+
+
 def cmd_all(cfg, args):
     for fn in (cmd_synth, cmd_ingest, cmd_prep, cmd_train, cmd_graph):
         print(f"\n===== {fn.__name__[4:]} =====")
@@ -174,7 +180,7 @@ def main(argv=None):
 
     ap = argparse.ArgumentParser(prog="mixtape")
     ap.add_argument("command", choices=["synth", "ingest", "prep", "train", "graph",
-                                        "bench", "demo", "all"])
+                                        "bench", "demo", "lite", "all"])
     ap.add_argument("--config", default=None)
     ap.add_argument("--models", nargs="+",
                     default=["popularity", "cooccur", "sasrec", "hybrid", "title"])
